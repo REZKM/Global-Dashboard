@@ -16,9 +16,14 @@ automatically.
 
 ## 1. Add your dashboard
 
-Copy your existing dashboard's `index.html`, CSS, JS, and any assets into
-`public/dashboard/`, replacing the placeholder file there. Keep `index.html`
-as the entry point.
+Copy your existing dashboard's HTML, CSS, JS, and any assets into
+`public/dashboard/`, replacing the placeholder file there.
+
+If your main dashboard file is named `index.html`, nothing else to do. If it
+keeps a different name (e.g. `GDC_Dashboard_latest.html`) and you don't want
+to rename it every time you update it, set an env var in Railway called
+`DASHBOARD_INDEX_FILE` to that exact filename — the server will look for
+whatever name you put there instead of `index.html`.
 
 ## 2. Decide who's allowed in
 

@@ -172,11 +172,19 @@ app.get('/logout', (req, res) => {
 });
 
 // ---- Protected dashboard ----
-// Drop your existing dashboard's HTML/CSS/JS files into public/dashboard/
-// (index.html must exist there). Everything under it requires login.
-app.use('/dashboard', requireAuth, express.static(path.join(__dirname, 'public', 'dashboard')));
+// Drop your existing dashboard's HTML/CSS/JS files into public/dashboard/.
+// The entry file defaults to "index.html", but if your dashboard file keeps
+// a different name (e.g. GDC_Dashboard_latest.html), set the
+// DASHBOARD_INDEX_FILE env var to that exact filename instead of renaming
+// it every time you update it.
+const DASHBOARD_INDEX_FILE = process.env.DASHBOARD_INDEX_FILE || 'index.html';
+app.use(
+  '/dashboard',
+  requireAuth,
+  express.static(path.join(__dirname, 'public', 'dashboard'), { index: DASHBOARD_INDEX_FILE })
+);
 app.get('/dashboard', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'dashboard', DASHBOARD_INDEX_FILE));
 });
 
 app.get('/', (req, res) => {
