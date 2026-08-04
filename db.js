@@ -12,6 +12,14 @@ const pool = new Pool({
   ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : false,
 });
 
+// Without this handler, a routine network blip on an idle connection (which
+// happens occasionally on any cloud-hosted database) throws an uncaught
+// exception and crashes the whole app. Logging it here instead lets the pool
+// quietly reconnect on the next query.
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle Postgres client (recovering):', err.message);
+});
+
 async function init() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (

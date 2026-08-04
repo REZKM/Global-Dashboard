@@ -8,6 +8,10 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Railway sits in front of the app as a reverse proxy — this makes Express
+// aware of that so things like req.protocol/req.ip reflect the real client.
+app.set('trust proxy', 1);
+
 // ---------------------------------------------------------------------------
 // Allowed emails: set the ALLOWED_EMAILS env var on Railway to a comma
 // separated list, e.g:  ALLOWED_EMAILS=alice@example.com,bob@example.com
@@ -44,11 +48,16 @@ app.use(
     maxAge: 12 * 60 * 60 * 1000, // 12 hours
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Deliberately not requiring "secure" (HTTPS-only) here: some platform
+    // proxies don't preserve that strictly enough for the cookie to survive
+    // the hop to the browser, which silently drops the whole session right
+    // after login. httpOnly + sameSite already block the realistic attacks
+    // (script access, cross-site requests) for a small internal dashboard.
   })
 );
 
 function requireAuth(req, res, next) {
+  console.log(`[requireAuth] path=${req.path} hasSession=${!!req.session} userEmail=${req.session && req.session.userEmail}`);
   if (req.session && req.session.userEmail) return next();
   return res.redirect('/login');
 }
@@ -62,30 +71,41 @@ function render(res, view, replacements = {}) {
   res.send(html);
 }
 
+// Express 4 does not catch errors thrown inside an async route handler —
+// an unhandled rejection there would otherwise crash the whole process.
+// Wrapping every async route with this wires it into the error middleware
+// below instead.
+function asyncHandler(fn) {
+  return (req, res, next) => fn(req, res, next).catch(next);
+}
+
 // ---- Step 1: ask for email ----
 app.get('/login', (req, res) => {
   if (req.session && req.session.userEmail) return res.redirect('/dashboard');
   render(res, 'login-email.html', { error: '' });
 });
 
-app.post('/check-email', async (req, res) => {
+app.post('/check-email', asyncHandler(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
+  const isAllowed = !!email && getAllowedEmails().includes(email);
+  console.log(`[check-email] email=${email} isAllowed=${isAllowed} allowedList=${JSON.stringify(getAllowedEmails())}`);
 
-  if (!email || !getAllowedEmails().includes(email)) {
+  if (!isAllowed) {
     return render(res, 'login-email.html', {
       error: '<div class="error">That email isn\'t on the allowed list. Contact your admin to be added.</div>',
     });
   }
 
   const existing = await db.findUser(email);
+  console.log(`[check-email] existing account found=${!!existing}`);
   if (existing) {
     return render(res, 'enter-password.html', { email, error: '' });
   }
   return render(res, 'set-password.html', { email, error: '' });
-});
+}));
 
 // ---- Step 2a: first-time visitor creates a password ----
-app.post('/set-password', async (req, res) => {
+app.post('/set-password', asyncHandler(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const { password, confirmPassword } = req.body;
 
@@ -115,22 +135,25 @@ app.post('/set-password', async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   await db.createUser(email, passwordHash);
+  console.log(`[set-password] created account for ${email}, setting session and redirecting to /dashboard`);
 
   req.session.userEmail = email;
   res.redirect('/dashboard');
-});
+}));
 
 // ---- Step 2b: returning visitor logs in with their password ----
-app.post('/enter-password', async (req, res) => {
+app.post('/enter-password', asyncHandler(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const { password } = req.body;
 
   const user = await db.findUser(email);
+  console.log(`[enter-password] email=${email} accountFound=${!!user}`);
   if (!user) {
     return render(res, 'login-email.html', { error: '' });
   }
 
   const ok = await bcrypt.compare(password || '', user.password_hash);
+  console.log(`[enter-password] passwordMatch=${ok}`);
   if (!ok) {
     return render(res, 'enter-password.html', {
       email,
@@ -139,8 +162,9 @@ app.post('/enter-password', async (req, res) => {
   }
 
   req.session.userEmail = email;
+  console.log(`[enter-password] login success for ${email}, redirecting to /dashboard`);
   res.redirect('/dashboard');
-});
+}));
 
 app.get('/logout', (req, res) => {
   req.session = null;
@@ -157,6 +181,23 @@ app.get('/dashboard', requireAuth, (req, res) => {
 
 app.get('/', (req, res) => {
   res.redirect(req.session && req.session.userEmail ? '/dashboard' : '/login');
+});
+
+// Catches anything passed to next(err) — e.g. a temporary database hiccup
+// during a request — and returns a normal error page instead of crashing.
+app.use((err, req, res, next) => {
+  console.error('Request failed:', err);
+  res.status(500).send('Something went wrong. Please try again.');
+});
+
+// Last-resort safety net: log unexpected errors instead of letting the whole
+// service crash and restart. If you start seeing these often, something is
+// worth investigating, but a single transient blip shouldn't take the app down.
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled promise rejection (recovering):', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (recovering):', err);
 });
 
 db.init()

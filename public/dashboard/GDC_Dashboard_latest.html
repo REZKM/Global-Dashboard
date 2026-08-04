@@ -252,6 +252,11 @@ section.view.blurred{filter:blur(5px);opacity:.45;pointer-events:none;user-selec
 .kpi.kpi-accent-blue .value{color:#fff;}
 .kpi.kpi-accent-blue .foot{color:rgba(255,255,255,0.8);}
 
+.kpi.kpi-accent-orange{background:#f59e0b;border-color:#f59e0b;}
+.kpi.kpi-accent-orange .label{color:rgba(255,255,255,0.8);}
+.kpi.kpi-accent-orange .value{color:#fff;}
+.kpi.kpi-accent-orange .foot{color:rgba(255,255,255,0.8);}
+
 .perf-filter-bar{
   display:flex;flex-direction:column;gap:14px;
   background:#fff;border:1px solid var(--card-border);border-radius:12px;
@@ -736,7 +741,9 @@ table.datatable a.mtext{color:var(--text);}
 .kpi-icon svg{width:100%;height:100%;}
 [dir="rtl"] .card.kpi{padding-left:18px;padding-right:46px;}
 [dir="rtl"] .kpi-icon{left:auto;right:16px;}
-.kpi.kpi-accent .kpi-icon,.kpi.kpi-accent-purple .kpi-icon,.kpi.kpi-accent-blue .kpi-icon{color:rgba(255,255,255,0.85);}
+.kpi.kpi-accent .kpi-icon,.kpi.kpi-accent-purple .kpi-icon,.kpi.kpi-accent-blue .kpi-icon,.kpi.kpi-accent-orange .kpi-icon{color:rgba(255,255,255,0.85);}
+.kpi.kpi-accent .compare-btn-mini,.kpi.kpi-accent-purple .compare-btn-mini,.kpi.kpi-accent-blue .compare-btn-mini,.kpi.kpi-accent-orange .compare-btn-mini{background:rgba(255,255,255,0.25);color:#fff;}
+.kpi.kpi-accent .compare-btn-mini:hover,.kpi.kpi-accent-purple .compare-btn-mini:hover,.kpi.kpi-accent-blue .compare-btn-mini:hover,.kpi.kpi-accent-orange .compare-btn-mini:hover{background:rgba(255,255,255,0.4);color:#fff;}
 
 .platform-icon{
   display:inline-flex;align-items:center;justify-content:center;
@@ -1453,6 +1460,7 @@ function addPerfRowTo(agg, r){
 function aggregatePerformanceRows(rows){
   const byProfile = {}, byPlatform = {}, byProfilePlatform = {};
   const dailyByProfile = {}, dailyByPlatform = {};
+  const dailyInteractionsByProfile = {};
   const dailyReachByProfile = {}, dailyReachByPlatform = {};
   const dailyPostsTotal = {}, dailyInteractionsTotal = {};
   const contentTypeCounter = {}; // post / shared etc (from "Content type" column)
@@ -1479,6 +1487,8 @@ function aggregatePerformanceRows(rows){
     if(d!=="unknown"){
       dailyByProfile[p] = dailyByProfile[p] || {};
       dailyByProfile[p][d] = (dailyByProfile[p][d]||0)+1;
+      dailyInteractionsByProfile[p] = dailyInteractionsByProfile[p] || {};
+      dailyInteractionsByProfile[p][d] = (dailyInteractionsByProfile[p][d]||0)+rowInteractions;
       dailyByPlatform[pf] = dailyByPlatform[pf] || {};
       dailyByPlatform[pf][d] = (dailyByPlatform[pf][d]||0)+1;
       const rv = Number(r.reach)||0;
@@ -1543,7 +1553,7 @@ function aggregatePerformanceRows(rows){
     byProfile: Object.values(byProfile),
     byPlatform: Object.values(byPlatform),
     byProfilePlatform: Object.values(byProfilePlatform),
-    dailyByProfile, dailyByPlatform, dailyReachByProfile, dailyReachByPlatform,
+    dailyByProfile, dailyByPlatform, dailyInteractionsByProfile, dailyReachByProfile, dailyReachByPlatform,
     dailyPostsTotal, dailyInteractionsTotal,
     contentType: contentTypeCounter,
     mediaType: mediaTypeCounter, mediaTypeInteractions, mediaTypeStats,
@@ -2358,14 +2368,14 @@ function renderPerfOverview(){
       <div class="card kpi">${kpiIconHTML("posts")}${kpiCompareBtnHTML("posts","Total posts")}<div class="label">Total posts</div><div class="value">${fmtSpan(t.posts)}</div>
         <div class="foot">${P.date_from?`${formatDatePretty(P.date_from)} → ${formatDatePretty(P.date_to)}`:"&nbsp;"}</div>
         ${(storiesCount>0 && contentScope==="all")?`<div class="foot" style="margin-top:2px">${fmt(storiesCount)} of ${fmt(t.posts)} posts are Instagram Stories</div>`:""}</div>
-      <div class="card kpi">${kpiIconHTML("reach")}${kpiCompareBtnHTML("reach","Total reach")}<div class="label">Total reach</div><div class="value">${fmtSpan(t.reach)}</div>
-        <div class="foot">${P.reachCovered}/${t.posts} posts carried a reach figure</div></div>
-      <div class="card kpi">${kpiIconHTML("impressions")}${kpiCompareBtnHTML("impressions","Total impressions")}<div class="label">Total impressions</div><div class="value">${fmtSpan(t.impressions)}</div>
-        <div class="foot">${P.impressionsCovered}/${t.posts} posts carried an impressions figure</div></div>
       <div class="card kpi">${kpiIconHTML("engagement")}${kpiCompareBtnHTML("engagement",engagementMetricLabel())}<div class="label">${esc(engagementMetricLabel())}</div><div class="value">${fmtSpan(t.engagement)}</div>
         <div class="foot">read from ${engagementMetricColumnLabel()}</div></div>
       <div class="card kpi">${kpiIconHTML("avg_engagement")}${kpiCompareBtnHTML("avg_engagement",metricLabel("avg_engagement"))}<div class="label">${esc(metricLabel("avg_engagement"))}</div><div class="value">${fmtSpan(t.posts?t.engagement/t.posts:0)}</div>
         <div class="foot">${P.engagementCovered}/${t.posts} posts had any ${esc(engagementMetricLabel().toLowerCase())}</div></div>
+      <div class="card kpi">${kpiIconHTML("reach")}${kpiCompareBtnHTML("reach","Total reach")}<div class="label">Total reach</div><div class="value">${fmtSpan(t.reach)}</div>
+        <div class="foot">${P.reachCovered}/${t.posts} posts carried a reach figure</div></div>
+      <div class="card kpi">${kpiIconHTML("impressions")}${kpiCompareBtnHTML("impressions","Total impressions")}<div class="label">Total impressions</div><div class="value">${fmtSpan(t.impressions)}</div>
+        <div class="foot">${P.impressionsCovered}/${t.posts} posts carried an impressions figure</div></div>
       <div class="card kpi">${kpiIconHTML("likes")}${kpiCompareBtnHTML("likes","Total reactions")}<div class="label">Total reactions</div><div class="value">${fmtSpan(t.likes)}</div>
         <div class="foot">likes / reactions column</div></div>
       <div class="card kpi">${kpiIconHTML("comments")}${kpiCompareBtnHTML("comments","Total comments")}<div class="label">Total comments</div><div class="value">${fmtSpan(t.comments)}</div>
@@ -2374,12 +2384,12 @@ function renderPerfOverview(){
         <div class="foot">&nbsp;</div></div>
       <div class="card kpi">${kpiIconHTML("video_views")}${kpiCompareBtnHTML("video_views","Video views")}<div class="label">Video views</div><div class="value">${fmtSpan(t.video_views)}</div>
         <div class="foot">${t.video_views?'summed across video posts':'no video-view data in this export'}</div></div>
-      <div class="card kpi">${kpiIconHTML("followers")}${kpiCompareBtnHTML("followers","Profile followers")}<div class="label">Profile followers</div><div class="value">${followersVals.length?fmtSpan(followersTotal):"—"}</div>
-        <div class="foot">${followersVals.length?'latest known snapshot per profile':'not reported in this export'}</div></div>
       <div class="card kpi">${kpiIconHTML("media_type")}${kpiCompareBtnHTML("media_type","Dominant media type","dominant")}<div class="label">Dominant media type</div><div class="value">${mt?esc(mt.type):"—"}</div>
         <div class="foot">${mt?`${fmt(mt.posts)} posts · ${fmt(mt.interactions)} ${esc(engagementMetricLabel().toLowerCase())} · ${fmt(mt.avgPerPost)} avg/post`:"no media-type data"}</div></div>
       <div class="card kpi">${kpiIconHTML("content_type")}${kpiCompareBtnHTML("content_type","Dominant content type","dominant")}<div class="label">Dominant content type</div><div class="value">${ctTop?esc(ctTop[0]):"—"}</div>
         <div class="foot">${ctBreakdown||"no content-type data"}</div></div>
+      <div class="card kpi kpi-accent-orange">${kpiIconHTML("followers")}${kpiCompareBtnHTML("followers","Profile followers")}<div class="label">Profile followers</div><div class="value">${followersVals.length?fmtSpan(followersTotal):"—"}</div>
+        <div class="foot">${followersVals.length?'latest known snapshot per profile':'not reported in this export'}</div></div>
     </div>
     ${P.platforms.length>1 ? (()=>{
       const totalPosts = t.posts||1;
@@ -2492,6 +2502,160 @@ function renderPerfFrequency(){
     renderPerfFrequency();
   });
   if(showScopeToggle) bindContentScopeToggles($("view-perf-reach"), renderPerfFrequency);
+  renderPerfBrandCombo(P, granularity);
+}
+
+// Multi-brand-only widget, appended under the main Posting Timeline chart: a Posts
+// line chart stacked directly above an Interactions/Engagements column chart, one
+// series per brand (same color for that brand's line and its columns), sharing the
+// same date axis and a single custom legend that drives both charts at once. Hovering
+// a brand's legend entry isolates just that brand across both charts; clicking toggles
+// it on/off permanently (tracked in manualHidden so a hover-then-leave restores the
+// right state). A narrow column of per-brand totals cards sits beside the charts.
+function renderPerfBrandCombo(P, granularity){
+  const container = $("view-perf-reach");
+  if(!container) return;
+  const brands = (P.profiles||[]).filter(Boolean);
+  if(brands.length<2) return;
+
+  const colorMap = entityColorMap(brands, "brand");
+  const rowsByBrand = brands.map(b=>(P.rowsData||[]).filter(r=>r.profile===b));
+  const aggByBrand = rowsByBrand.map(rows=>aggregatePerformanceRows(rows));
+  const postsByBrand = aggByBrand.map(a=>bucketDailyMap(a.dailyPostsTotal, granularity));
+  const interactionsByBrand = aggByBrand.map(a=>bucketDailyMap(a.dailyInteractionsTotal, granularity));
+  const buckets = Array.from(new Set([].concat(
+    ...postsByBrand.map(m=>Object.keys(m)),
+    ...interactionsByBrand.map(m=>Object.keys(m))
+  ))).sort();
+
+  const cardsHTML = brands.map((b,i)=>{
+    const t = aggByBrand[i].totals || {posts:0, engagement:0};
+    return `<div class="card" style="padding:10px 12px;border-left:4px solid ${esc(colorMap[b])}">
+      <div style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em" dir="auto">${esc(b)}</div>
+      <div style="margin-top:6px">
+        <div style="font-size:17px;font-weight:800">${fmtSpan(t.posts)}</div><div style="font-size:10px;color:var(--text-muted)">Posts</div>
+      </div>
+      <div style="margin-top:6px">
+        <div style="font-size:17px;font-weight:800">${fmtSpan(t.engagement)}</div><div style="font-size:10px;color:var(--text-muted)">${esc(engagementMetricLabel())}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  container.insertAdjacentHTML("beforeend", `
+    <div class="card" style="margin-top:16px">
+      <div class="card-head-row"><h3>Posts &amp; ${esc(engagementMetricLabel())} by brand</h3></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+        <div style="flex:1 1 360px;min-width:300px;display:flex;flex-direction:column;gap:6px">
+          <div class="chart-wrap" style="height:170px"><canvas id="perfBrandLineChart"></canvas></div>
+          <div class="chart-wrap" style="height:170px"><canvas id="perfBrandBarChart"></canvas></div>
+          <div class="pie-legend-row" id="perfBrandComboLegend" style="margin-top:2px"></div>
+        </div>
+        <div style="flex:0 0 220px;max-width:220px;min-width:170px;display:flex;flex-direction:column;gap:8px">${cardsHTML}</div>
+      </div>
+    </div>`);
+
+  destroyChart("perfBrandLine");
+  destroyChart("perfBrandBar");
+  const manualHidden = brands.map(()=>false);
+  // Forces both stacked charts to reserve the exact same y-axis gutter width, so their
+  // plot areas (and therefore the shared date axis) line up pixel-for-pixel. Wide enough
+  // to fit both the compact K-formatted ticks and the rotated axis title without the two
+  // overlapping each other.
+  const lockAxisWidth = { afterFit:(scale)=>{ scale.width = 64; } };
+  const kTickCallback = (val)=> fmt(val);
+
+  const lineDatasets = brands.map((b,i)=>({
+    label:b, data: buckets.map(k=>postsByBrand[i][k]||0),
+    borderColor:colorMap[b], backgroundColor:colorMap[b],
+    tension:.25, pointRadius:2, pointHoverRadius:4, borderWidth:2
+  }));
+  const barDatasets = brands.map((b,i)=>({
+    label:b, data: buckets.map(k=>interactionsByBrand[i][k]||0),
+    borderColor:colorMap[b], backgroundColor:colorMap[b]
+  }));
+
+  const lineCtx = $("perfBrandLineChart").getContext("2d");
+  charts.perfBrandLine = new Chart(lineCtx, {
+    type:"line",
+    data:{ labels: buckets, datasets: lineDatasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"index", intersect:false},
+      onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+      onClick:(evt,elements)=>{
+        if(!elements.length) return;
+        const idx = elements[0].index;
+        openDayDrilldown(buckets[idx], granularity);
+      },
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ticks:{display:false}, grid:{display:false}},
+        y:{beginAtZero:true, title:{display:true,text:"Posts"}, afterFit:lockAxisWidth.afterFit, ticks:{callback:kTickCallback}}
+      }
+    }
+  });
+
+  const barCtx = $("perfBrandBarChart").getContext("2d");
+  charts.perfBrandBar = new Chart(barCtx, {
+    type:"bar",
+    data:{ labels: buckets, datasets: barDatasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"index", intersect:false},
+      onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+      onClick:(evt,elements)=>{
+        if(!elements.length) return;
+        const idx = elements[0].index;
+        openDayDrilldown(buckets[idx], granularity);
+      },
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ticks:{maxRotation:0,autoSkip:true}},
+        y:{beginAtZero:true, title:{display:true,text:engagementMetricLabel()}, afterFit:lockAxisWidth.afterFit, ticks:{callback:kTickCallback}}
+      }
+    }
+  });
+
+  const applyHidden = ()=>{
+    [charts.perfBrandLine, charts.perfBrandBar].forEach(ch=>{
+      if(!ch) return;
+      brands.forEach((b,i)=>{ ch.getDatasetMeta(i).hidden = manualHidden[i]; });
+      ch.update();
+    });
+  };
+  const legendHTML = brands.map((b,i)=>`
+    <span class="brand-legend-item" data-brand-idx="${i}" dir="auto"
+      style="display:inline-flex;align-items:center;gap:6px;margin:0 14px 6px 0;font-size:12px;cursor:pointer;${manualHidden[i]?'opacity:.4;text-decoration:line-through;':''}">
+      <span style="width:10px;height:10px;border-radius:2px;background:${esc(colorMap[b])};display:inline-block"></span>${esc(b)}
+    </span>`).join("");
+  const legendEl = $("perfBrandComboLegend");
+  legendEl.innerHTML = legendHTML;
+  qsa(".brand-legend-item", legendEl).forEach(item=>{
+    const i = Number(item.dataset.brandIdx);
+    item.addEventListener("mouseenter", ()=>{
+      [charts.perfBrandLine, charts.perfBrandBar].forEach(ch=>{
+        brands.forEach((b,bi)=>{ ch.getDatasetMeta(bi).hidden = (bi===i) ? manualHidden[bi] : true; });
+        ch.update("none");
+      });
+    });
+    item.addEventListener("mouseleave", applyHidden);
+    item.addEventListener("click", ()=>{
+      manualHidden[i] = !manualHidden[i];
+      item.style.opacity = manualHidden[i] ? ".4" : "1";
+      item.style.textDecoration = manualHidden[i] ? "line-through" : "none";
+      applyHidden();
+    });
+  });
+
+  // renderPerfFrequency (our caller) is invoked from several different entry points —
+  // the full renderPerformanceDashboard() rebuild, but also the Daily/Weekly/Monthly
+  // granularity toggle and the Posts/Stories/All content-scope toggle, neither of which
+  // trigger the page-level animateCounters(root) pass. Without calling it ourselves here,
+  // the count-up cards' text nodes stay frozen at their initial "0" forever on those two
+  // paths (only a full dashboard rebuild — e.g. clicking Reset filters — would catch them),
+  // which is exactly the "cards zero out" bug this fixes.
+  animateCardsIn(container);
+  animateCounters(container);
 }
 
 function exportTimelineSection(config){
