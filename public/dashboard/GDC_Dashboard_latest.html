@@ -5847,7 +5847,7 @@ function defaultWizardState(){
     branch: null,
     step: 0,
     listening: { reportType:null, exportParsed:null, dateFrom:null, dateTo:null, clientName:"", guidelinesAccent:null, brief:"", previewDataset:null },
-    perf: { scope:null, brandCount:2, brands:[""], platforms:[], brandAssets:[{palette:[],accent:null,fileName:null}], brandFiles:[null], brandAccountType:["owned"], previewDataset:null },
+    perf: { scope:null, brandCount:2, brands:[""], platforms:[], brandAssets:[{palette:[],accent:null,fileName:null}], brandFiles:[null], brandAccountType:[null], previewDataset:null },
     perfExportParsed: null
   };
 }
@@ -6043,34 +6043,37 @@ function stepHTML_brandAssets(){
   const P = WZ.perf;
   const brands = P.brands.filter(Boolean);
   if(!brands.length) return `<h2>Brand guidelines</h2><p class="wiz-sub">Go back and name your brand(s) first.</p>`;
-  ensureBrandAccountTypeArray();
   return `<h2>Brand logo / guidelines <span class="opt">(optional)</span></h2>
   <p class="wiz-sub">Upload PNG/JPEG/PDF per brand to auto-extract an accent color.</p>
   <div class="brand-asset-grid">
     ${brands.map((name,i)=>{
-      const type = P.brandAccountType[i]||"owned";
       return `
       <div class="card brand-asset-card">
         <h3 dir="auto">${esc(name)}</h3>
-        <div class="formgroup" style="margin-bottom:12px">
-          <label>Account type</label>
-          <p class="hint" style="margin:2px 0 8px">Whether ${esc(name)}'s accounts are your own (full API access) or a public/competitor profile (Emplifi only sees what's publicly visible) — this changes which Interactions/Engagements numbers are actually available per platform.</p>
-          <div class="pill-toggle brandAccountTypeToggle" data-idx="${i}">
-            <button data-type="owned" class="${type==='owned'?'active':''}">Owned account</button>
-            <button data-type="public" class="${type==='public'?'active':''}">Public account</button>
-          </div>
-        </div>
         <input type="file" class="brandAssetInput" data-idx="${i}" accept="image/*,.pdf">
         <div class="swatchrow" id="brandAssetSwatches_${i}"></div>
       </div>`;
     }).join("")}
   </div>`;
 }
+function accountTypeToggleHTML(idx, type){
+  return `<div class="formgroup" style="margin-top:10px">
+    <label>Account type <span class="req" style="color:#dc2626">*</span></label>
+    <p class="hint" style="margin:2px 0 8px">Whether this brand's accounts are your own (full API access) or a public/competitor profile (Emplifi only sees what's publicly visible) — this changes which Interactions/Engagements numbers are actually available per platform.</p>
+    <div class="pill-toggle brandAccountTypeToggle" data-idx="${idx}">
+      <button data-type="owned" class="${type==='owned'?'active':''}">Owned account</button>
+      <button data-type="public" class="${type==='public'?'active':''}">Public account</button>
+    </div>
+    ${!type ? `<p class="hint" style="margin:6px 0 0;color:#dc2626">Required — select one to continue.</p>` : ""}
+  </div>`;
+}
 function stepHTML_uploadExportPerformance(){
+  ensureBrandAccountTypeArray();
   if(isMultiBrand(WZ.perf.scope)){
     ensureBrandFilesArray();
     const rows = WZ.perf.brands.map((name,i)=>{
       const bf = WZ.perf.brandFiles[i];
+      const type = WZ.perf.brandAccountType[i];
       return `<div class="wz-brandblock">
         <h4 dir="auto">${esc(name||("Brand "+(i+1)))}</h4>
         <input type="file" class="wizPerfBrandFileInput" data-idx="${i}" accept=".xlsx">
@@ -6083,6 +6086,7 @@ function stepHTML_uploadExportPerformance(){
               <li>Platforms: ${bf.platformsFound.map(esc).join(", ")||"—"}</li>
             </ul>
           </div>${columnSumsBoxHTML(bf.columnSums)}` : ""}
+        ${accountTypeToggleHTML(i, type)}
       </div>`;
     }).join("");
     return `<h2>Upload each brand's export</h2>
@@ -6090,6 +6094,7 @@ function stepHTML_uploadExportPerformance(){
     ${rows}`;
   }
   const ep = WZ.perfExportParsed;
+  const type0 = WZ.perf.brandAccountType[0];
   return `<h2>Upload your performance export</h2>
   <p class="wiz-sub">Emplifi, or a similarly-shaped export from Apify, Sprout Social, or another scraper (.xlsx).</p>
   <input type="file" id="wizPerfExportInput" accept=".xlsx">
@@ -6102,7 +6107,8 @@ function stepHTML_uploadExportPerformance(){
         <li>Platforms: ${ep.platformsFound.map(esc).join(", ")||"—"}</li>
       </ul>`}
     </div>${ep.usingSample?"":columnSumsBoxHTML(ep.columnSums)}` : ""}
-  </div>`;
+  </div>
+  ${accountTypeToggleHTML(0, type0)}`;
 }
 function ensureBrandFilesArray(){
   if(!WZ.perf.brandFiles) WZ.perf.brandFiles = [];
@@ -6115,7 +6121,7 @@ function ensureBrandFilesArray(){
 // as before.
 function ensureBrandAccountTypeArray(){
   if(!WZ.perf.brandAccountType) WZ.perf.brandAccountType = [];
-  while(WZ.perf.brandAccountType.length < WZ.perf.brands.length) WZ.perf.brandAccountType.push("owned");
+  while(WZ.perf.brandAccountType.length < WZ.perf.brands.length) WZ.perf.brandAccountType.push(null);
   WZ.perf.brandAccountType.length = WZ.perf.brands.length;
 }
 // Name-keyed {brandName: "owned"|"public"} map built from the wizard's parallel
@@ -6330,6 +6336,13 @@ function bindWizardStepEvents(stepId){
     } else {
       $("wizPerfExportInput").addEventListener("change", (e)=>{ if(e.target.files[0]) handleWizardPerformanceExport(e.target.files[0]); });
     }
+    qsa(".brandAccountTypeToggle").forEach(group=>{
+      const idx = +group.dataset.idx;
+      qsa("button", group).forEach(btn=>btn.addEventListener("click", ()=>{
+        WZ.perf.brandAccountType[idx] = btn.dataset.type;
+        renderWizard();
+      }));
+    });
   }
   else if(stepId==="dateRange"){
     const f = $("wizDateFrom"), t = $("wizDateTo");
@@ -6357,7 +6370,7 @@ function bindWizardStepEvents(stepId){
       WZ.perf.brands = isMultiBrand(WZ.perf.scope) ? Array(WZ.perf.brandCount).fill("") : [""];
       WZ.perf.platforms = [];
       WZ.perf.brandFiles = WZ.perf.brands.map(()=>null);
-      WZ.perf.brandAccountType = WZ.perf.brands.map(()=>"owned");
+      WZ.perf.brandAccountType = WZ.perf.brands.map(()=>null);
       WZ.perfExportParsed = null;
       renderWizard();
     }));
@@ -6393,13 +6406,6 @@ function bindWizardStepEvents(stepId){
     }));
   }
   else if(stepId==="brandAssets"){
-    qsa(".brandAccountTypeToggle").forEach(group=>{
-      const idx = +group.dataset.idx;
-      qsa("button", group).forEach(btn=>btn.addEventListener("click", ()=>{
-        WZ.perf.brandAccountType[idx] = btn.dataset.type;
-        renderWizard();
-      }));
-    });
     qsa(".brandAssetInput").forEach(inp=>inp.addEventListener("change", async e=>{
       const idx = +e.target.dataset.idx;
       const file = e.target.files[0]; if(!file) return;
@@ -6421,13 +6427,18 @@ function validateStep(stepId){
   if(stepId==="reportType") return WZ.listening.reportType ? null : "Choose a report type.";
   if(stepId==="uploadExport" && WZ.branch==="listening") return WZ.listening.exportParsed ? null : "Upload an export, or use the sample data.";
   if(stepId==="uploadExport" && WZ.branch==="performance"){
+    ensureBrandAccountTypeArray();
     if(isMultiBrand(WZ.perf.scope)){
       ensureBrandFilesArray();
       const missingIdx = WZ.perf.brandFiles.findIndex(bf=>!bf);
       if(missingIdx>-1) return `Upload an export for "${WZ.perf.brands[missingIdx]||("Brand "+(missingIdx+1))}" before continuing.`;
+      const missingTypeIdx = WZ.perf.brandAccountType.findIndex(t=>!t);
+      if(missingTypeIdx>-1) return `Choose whether "${WZ.perf.brands[missingTypeIdx]||("Brand "+(missingTypeIdx+1))}" is an Owned or Public account before continuing.`;
       return null;
     }
-    return WZ.perfExportParsed ? null : "Upload an export, or use sample data.";
+    if(!WZ.perfExportParsed) return "Upload an export, or use sample data.";
+    if(!WZ.perf.brandAccountType[0]) return `Choose whether "${WZ.perf.brands[0]||"this brand"}" is an Owned or Public account before continuing.`;
+    return null;
   }
   if(stepId==="dateRange"){
     if(!WZ.listening.dateFrom || !WZ.listening.dateTo) return "Pick a date range.";
