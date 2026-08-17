@@ -273,6 +273,27 @@ section.view.blurred{filter:blur(5px);opacity:.45;pointer-events:none;user-selec
 .clickable-row{cursor:pointer;transition:background .12s ease;}
 .clickable-row:hover{background:var(--neutral-soft);}
 
+.ask-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+@media (max-width:900px){.ask-layout{grid-template-columns:1fr;}}
+.ask-qlist{display:flex;flex-direction:column;gap:6px;}
+.ask-qbtn{text-align:left;padding:10px 12px;border-radius:8px;border:1.5px solid var(--card-border);background:var(--card-bg);color:var(--text);font-size:12.5px;cursor:pointer;transition:background .12s ease,border-color .12s ease;}
+[dir="rtl"] .ask-qbtn{text-align:right;}
+.ask-qbtn:hover{background:var(--neutral-soft);}
+.ask-qbtn.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-dark);font-weight:600;}
+.ask-answer-card{background:var(--neutral-soft);border-radius:10px;padding:14px 16px;}
+.ask-answer-label{color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;font-weight:600;}
+.ask-answer-text{font-size:13.5px;line-height:1.5;margin:0 0 12px;}
+.ask-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.ask-bar-label{font-size:11px;color:var(--text-muted);width:96px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ask-bar-track{flex:1;background:var(--card-border);border-radius:4px;height:8px;overflow:hidden;}
+.ask-bar-fill{height:100%;background:var(--accent);}
+.ask-bar-value{font-size:11px;width:50px;text-align:right;flex-shrink:0;}
+.ask-free-row{display:flex;gap:8px;margin-top:16px;}
+.ask-free-row input{flex:1;height:38px;border-radius:8px;border:1.5px solid var(--card-border);background:var(--bg);color:var(--text);padding:0 12px;font-size:13px;}
+.ask-free-row button{width:38px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:15px;cursor:pointer;flex-shrink:0;}
+.ask-free-row button:hover{background:var(--accent-dark);}
+.ask-hint{font-size:11.5px;color:var(--text-muted);margin-top:6px;}
+
 @media (prefers-reduced-motion: reduce){
   .card-enter{animation:none;}
   .live-dot{animation:none;}
@@ -2720,6 +2741,280 @@ function platformIconHTML(platform){
 function platformBrandStyle(platform){
   const key = String(platform||"").toLowerCase().replace(/[^a-z]/g,"");
   return PLATFORM_BRAND_STYLE[key] || {bg:"#3a3d42", text:"#ffffff"};
+}
+
+/* ============================================================
+   ASK ME — canned Q&A + rule-based free-text matching, tailored
+   per report scope (single/multi brand x single/multi platform).
+   Every answer is computed live from the same aggregates used
+   elsewhere on the dashboard (P.totals/byProfile/byPlatform/etc.)
+   — nothing here is answered by a model, so numbers always match
+   the rest of the dashboard and respect whatever filter is active.
+   ============================================================ */
+function platDisplay(p){ return PLATFORM_LABEL(platformKeyOf(p)); }
+function topEntryBy(list, field){
+  if(!list || !list.length) return null;
+  return [...list].sort((a,b)=>(b[field]||0)-(a[field]||0))[0];
+}
+function pctChange(a,b){
+  if(!a) return null;
+  return Math.round(((b-a)/a)*1000)/10;
+}
+function barsFromList(list, field, kind){
+  return [...(list||[])].sort((a,b)=>(b[field]||0)-(a[field]||0)).map(x=>({
+    label: kind==="platform" ? platDisplay(x.platform) : (x.profile||x.platform||"—"),
+    value: x[field]||0
+  }));
+}
+function followerTrendFor(rows){
+  const byCombo = {};
+  (rows||[]).forEach(r=>{
+    const fv = Number(r.followers);
+    if(!(fv>0)) return;
+    const d = dayOf(r.date);
+    if(d==="unknown") return;
+    const profile = r.profile||"Unknown", platform = r.platform||"Unknown";
+    const combo = profile+" · "+platform;
+    if(!byCombo[combo]) byCombo[combo] = {profile, platform, first:{date:d,value:fv}, last:{date:d,value:fv}};
+    const c = byCombo[combo];
+    if(d < c.first.date) c.first = {date:d, value:fv};
+    if(d >= c.last.date) c.last = {date:d, value:fv};
+  });
+  return Object.values(byCombo);
+}
+function coverageFor(rows){
+  const total = (rows||[]).length || 1;
+  const reach = (rows||[]).filter(r=>Number(r.reach)>0).length;
+  const impressions = (rows||[]).filter(r=>Number(r.impressions)>0).length;
+  return { reachPct: Math.round(reach/total*100), impressionsPct: Math.round(impressions/total*100) };
+}
+function storiesVsPostsFor(rows){
+  let stories=0, posts=0, storyEng=0, postEng=0;
+  (rows||[]).forEach(r=>{
+    const eng = engagementValueOf(r);
+    if(isStoryRow(r)){ stories++; storyEng+=eng; } else { posts++; postEng+=eng; }
+  });
+  return { stories, posts, storyEng, postEng };
+}
+function bestPostAnswer(P, mentionProfile){
+  const top = (P.topPosts||[])[0];
+  if(!top) return "No posts with a measurable metric were found in this data.";
+  const who = mentionProfile ? `by ${esc(top.profile)} ` : "";
+  return `Your top post ${who}was on ${platDisplay(top.platform)} (${top.date?formatDatePretty(top.date):"date unknown"}), with ${fmt(top.engagement)} ${engagementMetricLabel().toLowerCase()}.`;
+}
+const ASK_QUESTION_BANK = {
+  single_brand_single_platform: [
+    { id:"reach_impr", q:()=>"What's our total reach and impressions this period?", keywords:["reach","impression"],
+      compute(P){ const t=P.totals; return { text:`Total reach was ${fmt(t.reach)} and impressions were ${fmt(t.impressions)} across ${fmt(t.posts)} posts.` }; } },
+    { id:"content_split", q:()=>"How many posts did we publish, and how does that split by content type?", keywords:["content type","how many posts","split"],
+      compute(P){ const t=P.totals; const entries=Object.entries(P.contentType||{}).sort((a,b)=>b[1]-a[1]);
+        const bars = entries.map(([k,v])=>({label:cap(k),value:v}));
+        return { text: entries.length ? `${fmt(t.posts)} posts were published, most often ${cap(entries[0][0])} (${fmt(entries[0][1])} of them).` : `${fmt(t.posts)} posts were published.`, bars }; } },
+    { id:"engagement_rate", q:()=>"What's our engagement rate, and how has it trended?", keywords:["engagement rate","trend","trending","rate"],
+      compute(P){ const t=P.totals; const perPost = t.posts ? t.engagement/t.posts : 0;
+        const days = Object.keys(P.dailyInteractionsTotal||{}).sort();
+        let trendTxt = "";
+        if(days.length>=4){
+          const mid = Math.floor(days.length/2);
+          const avg = ds => ds.length ? ds.reduce((a,d)=>a+(P.dailyInteractionsTotal[d]||0),0)/ds.length : 0;
+          const chg = pctChange(avg(days.slice(0,mid)), avg(days.slice(mid)));
+          if(chg!=null) trendTxt = ` ${engagementMetricLabel()} per day ${chg>=0?"rose":"fell"} ${Math.abs(chg)}% from the first half of this period to the second half.`;
+        }
+        return { text: `Average ${engagementMetricLabel().toLowerCase()} per post is ${fmt(perPost)}.${trendTxt}` }; } },
+    { id:"followers", q:()=>"What's our current follower count, and how has it changed?", keywords:["follower","followers"],
+      compute(P){ const w = computeFollowersWidgets(P.rowsData||[])[0];
+        const trend = followerTrendFor(P.rowsData||[])[0];
+        let chgTxt = "";
+        if(trend){ const chg = pctChange(trend.first.value, trend.last.value); if(chg!=null) chgTxt = ` That's ${chg>=0?"up":"down"} ${Math.abs(chg)}% since the earliest snapshot in this data (${trend.first.date} → ${trend.last.date}).`; }
+        return { text: (w && w.mode==="single") ? `Current followers: ${fmt(w.value)}.${chgTxt}` : "Followers weren't reported in this export." }; } },
+    { id:"best_post", q:()=>"What's our best-performing post this period?", keywords:["best post","top post","best performing"],
+      compute(P){ return { text: bestPostAnswer(P,false) }; } },
+    { id:"cadence", q:()=>"Which day do we post most, and does that day actually drive engagement?", keywords:["day","cadence","frequency"],
+      compute(P){ const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+        const postDay = DOW.reduce((best,d)=> (P.cadence[d]||0) > (P.cadence[best]||0) ? d : best, DOW[0]);
+        const engDay = DOW.reduce((best,d)=> (P.cadenceInteractions[d]||0) > (P.cadenceInteractions[best]||0) ? d : best, DOW[0]);
+        const bars = DOW.map(d=>({label:d, value:P.cadence[d]||0}));
+        const same = postDay===engDay;
+        return { text: `We post most on ${postDay} (${fmt(P.cadence[postDay]||0)} posts). ${same? `That's also the day that drives the most ${engagementMetricLabel().toLowerCase()}.` : `${engDay} actually drives the most ${engagementMetricLabel().toLowerCase()}, not ${postDay}.`}`, bars }; } },
+    { id:"account_type", q:()=>"Is this account Owned or Public, and does that limit what's measurable?", keywords:["owned","public","account type"],
+      compute(P){ const map = (P.declared&&P.declared.brandAccountType)||{}; const profile = (P.profiles||[])[0];
+        const type = map[profile]||"owned";
+        const limitTxt = type==="public" ? ` Public accounts don't expose the Engagements column, so if you're viewing Engagements it will read 0 here — switch to Total Interactions for a real number.` : "";
+        return { text: `${esc(profile||"This brand")} is set as ${type==="owned"?"Owned":"Public"}.${limitTxt}` }; } },
+    { id:"quality", q:()=>"How complete is this data?", keywords:["complete","quality","gaps","coverage"],
+      compute(P){ const cov = coverageFor(P.rowsData||[]);
+        const warn = (P.warnings||[]).length ? ` ${P.warnings.length} data-quality note${P.warnings.length>1?"s":""} also apply — see the Data Quality page.` : "";
+        return { text: `${cov.reachPct}% of rows report reach and ${cov.impressionsPct}% report impressions, out of ${fmt(P.rowCount||0)} rows.${warn}` }; } }
+  ],
+  single_brand_multi_platform: [
+    { id:"top_platform_engagement", q:()=>"Which platform drives the most engagement for us?", keywords:["platform","engagement","most"],
+      compute(P){ const top = topEntryBy(P.byPlatform,"engagement"); const bars = barsFromList(P.byPlatform,"engagement","platform");
+        const total = P.totals.engagement||0; const pct = total? Math.round((top.engagement/total)*100):0;
+        return { text: top? `${platDisplay(top.platform)} drives the most ${engagementMetricLabel().toLowerCase()}, with ${fmt(top.engagement)} — ${pct}% of the total.` : "No engagement data found.", bars }; } },
+    { id:"top_platform_followers", q:()=>"Which platform has the most followers, and which is growing fastest?", keywords:["followers","growing","fastest"],
+      compute(P){ const w = computeFollowersWidgets(P.rowsData||[])[0];
+        const trends = followerTrendFor(P.rowsData||[]).map(t=>({platform:t.platform, chg:pctChange(t.first.value,t.last.value)})).filter(t=>t.chg!=null);
+        const fastest = trends.sort((a,b)=>b.chg-a.chg)[0];
+        let leadTxt = "Followers weren't reported.", bars = [];
+        if(w && w.mode==="brand-platforms"){
+          leadTxt = `${platDisplay(w.breakdown[0].platform)} has the most followers (${fmt(w.breakdown[0].value)}, ${w.breakdown[0].pct}% of our total footprint).`;
+          bars = w.breakdown.map(b=>({label:platDisplay(b.platform), value:b.value}));
+        }
+        const fastTxt = fastest ? ` ${platDisplay(fastest.platform)} is growing fastest, up ${fastest.chg}% across this data.` : "";
+        return { text: leadTxt+fastTxt, bars }; } },
+    { id:"engagement_rate_platform", q:()=>"Which platform gets the best engagement rate per post?", keywords:["rate","per post","efficient","efficiency"],
+      compute(P){ const withRate = P.byPlatform.map(x=>({platform:x.platform, rate: x.posts? x.engagement/x.posts:0}));
+        const best = topEntryBy(withRate,"rate"); const bars = barsFromList(withRate,"rate","platform").map(b=>({label:b.label, value:Math.round(b.value)}));
+        return { text: best? `${platDisplay(best.platform)} gets the best ${engagementMetricLabel().toLowerCase()} per post, averaging ${fmt(best.rate)}.` : "Not enough data.", bars }; } },
+    { id:"cadence_by_platform", q:()=>"How does posting frequency compare across our platforms?", keywords:["frequency","how often","posting"],
+      compute(P){ const bars = barsFromList(P.byPlatform,"posts","platform"); const top = topEntryBy(P.byPlatform,"posts");
+        return { text: top? `We post most on ${platDisplay(top.platform)} (${fmt(top.posts)} posts).` : "No posts found.", bars }; } },
+    { id:"stories_by_platform", q:()=>"How do Stories compare to regular posts, and does that differ by platform?", keywords:["stories","story","regular posts"],
+      compute(P){ const s = storiesVsPostsFor(P.rowsData||[]);
+        if(!s.stories) return { text: "No Story-type content was found in this data — every row is a regular post." };
+        return { text: `${fmt(s.posts)} regular posts (${fmt(s.postEng)} ${engagementMetricLabel().toLowerCase()}) versus ${fmt(s.stories)} Stories (${fmt(s.storyEng)} ${engagementMetricLabel().toLowerCase()}).` }; } },
+    { id:"best_post_platform", q:()=>"What's our best-performing post, and which platform was it on?", keywords:["best post","top post"],
+      compute(P){ return { text: bestPostAnswer(P,false) }; } },
+    { id:"quality_by_platform", q:()=>"Is data completeness even across platforms, or is one weaker?", keywords:["complete","quality","gaps","coverage"],
+      compute(P){ const byPf = {}; (P.rowsData||[]).forEach(r=>{ const pf=r.platform||"Unknown"; byPf[pf]=byPf[pf]||[]; byPf[pf].push(r); });
+        const rows = Object.entries(byPf).map(([pf,rs])=>Object.assign({platform:pf}, coverageFor(rs)));
+        const weakest = rows.sort((a,b)=>a.reachPct-b.reachPct)[0];
+        const bars = rows.map(r=>({label:platDisplay(r.platform), value:r.reachPct}));
+        return { text: weakest? `${platDisplay(weakest.platform)} has the weakest reach coverage at ${weakest.reachPct}% of its rows.` : "No data.", bars }; } }
+  ],
+  multi_brand_single_platform: [
+    { id:"top_brand_engagement", q(P){ return `Which brand is leading on ${platDisplay((P.platforms||[])[0])} by engagement?`; }, keywords:["brand","leading","engagement"],
+      compute(P){ const top = topEntryBy(P.byProfile,"engagement"); const bars = barsFromList(P.byProfile,"engagement");
+        return { text: top? `${esc(top.profile)} leads with ${fmt(top.engagement)} ${engagementMetricLabel().toLowerCase()}.` : "No data.", bars }; } },
+    { id:"top_brand_followers", q:()=>"Which brand has the most followers?", keywords:["followers"],
+      compute(P){ const w = computeFollowersWidgets(P.rowsData||[])[0];
+        if(!w || w.mode!=="top-brand") return { text:"Followers weren't reported." };
+        const bars = [w.top].concat(w.others).map(x=>({label:x.profile, value:x.value}));
+        return { text: `${esc(w.top.profile)} has the most followers, with ${fmt(w.top.value)}.`, bars }; } },
+    { id:"most_active_brand", q:()=>"Which brand posts most often?", keywords:["posts most","often","frequency"],
+      compute(P){ const top = topEntryBy(P.byProfile,"posts"); const bars = barsFromList(P.byProfile,"posts");
+        return { text: top? `${esc(top.profile)} posts most often, with ${fmt(top.posts)} posts.` : "No data.", bars }; } },
+    { id:"best_rate_brand", q:()=>"Which brand gets the best engagement rate per post?", keywords:["rate","per post","efficient"],
+      compute(P){ const withRate = P.byProfile.map(x=>({profile:x.profile, rate:x.posts? x.engagement/x.posts:0}));
+        const best = topEntryBy(withRate,"rate"); const bars = barsFromList(withRate,"rate").map(b=>({label:b.label,value:Math.round(b.value)}));
+        return { text: best? `${esc(best.profile)} gets the best ${engagementMetricLabel().toLowerCase()} per post, averaging ${fmt(best.rate)}.` : "No data.", bars }; } },
+    { id:"best_post_brand", q:()=>"Which brand has the single best-performing post?", keywords:["best post","top post"],
+      compute(P){ return { text: bestPostAnswer(P,true) }; } },
+    { id:"account_types_brand", q:()=>"Are all brands measured the same way, and does that skew the comparison?", keywords:["owned","public","account type","skew"],
+      compute(P){ const map=(P.declared&&P.declared.brandAccountType)||{}; const profiles=P.profiles||[];
+        const owned = profiles.filter(p=>(map[p]||"owned")==="owned"), pub = profiles.filter(p=>(map[p]||"owned")==="public");
+        if(!pub.length) return { text: `All ${profiles.length} brands are set as Owned accounts — comparable on every metric.` };
+        const skewNote = engagementMetricMode()==="engagements" ? ` Since you're viewing Engagements, ${pub.join(", ")} will read 0 there — switch to Total Interactions to compare fairly.` : "";
+        return { text: `${owned.length} of ${profiles.length} brands are Owned; ${pub.join(", ")} ${pub.length>1?"are":"is"} Public.${skewNote}` }; } },
+    { id:"quality_by_brand", q:()=>"Does data completeness differ by brand?", keywords:["complete","quality","gaps"],
+      compute(P){ const byPr = {}; (P.rowsData||[]).forEach(r=>{ const p=r.profile||"Unknown"; byPr[p]=byPr[p]||[]; byPr[p].push(r); });
+        const rows = Object.entries(byPr).map(([p,rs])=>Object.assign({profile:p}, coverageFor(rs)));
+        const weakest = rows.sort((a,b)=>a.reachPct-b.reachPct)[0];
+        const bars = rows.map(r=>({label:r.profile, value:r.reachPct}));
+        return { text: weakest? `${esc(weakest.profile)} has the weakest reach coverage at ${weakest.reachPct}% of its rows.` : "No data.", bars }; } }
+  ],
+  multi_brand_multi_platform: [
+    { id:"leading_brand_overall", q:()=>"Which brand is leading overall, and on which platform?", keywords:["leading","overall","brand"],
+      compute(P){ const top = topEntryBy(P.byProfile,"engagement");
+        if(!top) return { text:"No data." };
+        const combos = (P.byProfilePlatform||[]).filter(c=>c.profile===top.profile);
+        const bestCombo = topEntryBy(combos,"engagement");
+        const bars = barsFromList(P.byProfile,"engagement");
+        return { text: `${esc(top.profile)} is leading overall with ${fmt(top.engagement)} ${engagementMetricLabel().toLowerCase()}${bestCombo? `, driven mostly by ${platDisplay(bestCombo.platform)}`:""}.`, bars }; } },
+    { id:"leading_platform_overall", q:()=>"Which platform is the strongest performer across all brands?", keywords:["platform","strongest","overall"],
+      compute(P){ const top = topEntryBy(P.byPlatform,"engagement"); const bars = barsFromList(P.byPlatform,"engagement","platform");
+        return { text: top? `${platDisplay(top.platform)} is the strongest platform across all brands, with ${fmt(top.engagement)} combined ${engagementMetricLabel().toLowerCase()}.` : "No data.", bars }; } },
+    { id:"brand_best_platform", q(P){ const top=topEntryBy(P.byProfile,"engagement"); return `Which of ${top?esc(top.profile):"the leading brand"}'s platforms performs best?`; }, keywords:["which platform","its platforms","best"],
+      compute(P){ const top = topEntryBy(P.byProfile,"engagement");
+        if(!top) return { text:"No data." };
+        const combos = (P.byProfilePlatform||[]).filter(c=>c.profile===top.profile);
+        const bars = barsFromList(combos,"engagement","platform"); const best = topEntryBy(combos,"engagement");
+        return { text: best? `For ${esc(top.profile)}, ${platDisplay(best.platform)} performs best with ${fmt(best.engagement)} ${engagementMetricLabel().toLowerCase()}.` : "No data.", bars }; } },
+    { id:"best_combo", q:()=>"Which brand/platform pairing has the best engagement rate?", keywords:["pairing","combination","rate"],
+      compute(P){ const withRate = (P.byProfilePlatform||[]).map(x=>({profile:x.profile, platform:x.platform, rate:x.posts? x.engagement/x.posts:0}));
+        const best = topEntryBy(withRate,"rate");
+        return { text: best? `${esc(best.profile)} on ${platDisplay(best.platform)} has the best rate, averaging ${fmt(best.rate)} ${engagementMetricLabel().toLowerCase()} per post.` : "No data." }; } },
+    { id:"content_mix", q:()=>"How does content mix differ across brands and platforms?", keywords:["content type","mix"],
+      compute(P){ const entries=Object.entries(P.contentType||{}).sort((a,b)=>b[1]-a[1]);
+        const bars = entries.map(([k,v])=>({label:cap(k),value:v}));
+        return { text: entries.length? `Across all brands and platforms, ${cap(entries[0][0])} is the most common content type (${fmt(entries[0][1])} posts).` : "No data.", bars }; } },
+    { id:"account_types_all", q:()=>"Which brands are Owned vs Public, and how does that affect what's comparable?", keywords:["owned","public","account type"],
+      compute(P){ const map=(P.declared&&P.declared.brandAccountType)||{}; const profiles=P.profiles||[];
+        const owned = profiles.filter(p=>(map[p]||"owned")==="owned"), pub = profiles.filter(p=>(map[p]||"owned")==="public");
+        if(!pub.length) return { text: `All ${profiles.length} brands are Owned accounts.` };
+        return { text: `Owned: ${owned.join(", ")||"none"}. Public: ${pub.join(", ")}. Public brands will read 0 for Engagements — use Total Interactions to compare them fairly.` }; } },
+    { id:"quality_gaps_all", q:()=>"Where are the biggest data-quality gaps, and for which brand/platform?", keywords:["gaps","quality","complete"],
+      compute(P){ const byCombo = {}; (P.rowsData||[]).forEach(r=>{ const k=(r.profile||"Unknown")+" · "+(r.platform||"Unknown"); byCombo[k]=byCombo[k]||[]; byCombo[k].push(r); });
+        const rows = Object.entries(byCombo).map(([k,rs])=>Object.assign({combo:k}, coverageFor(rs)));
+        const weakest = rows.sort((a,b)=>a.reachPct-b.reachPct)[0];
+        return { text: weakest? `${weakest.combo} has the weakest reach coverage at ${weakest.reachPct}% of its rows.` : "No data." }; } }
+  ]
+};
+function matchQuestionByText(text, bank){
+  const t = String(text||"").toLowerCase();
+  if(!t.trim()) return null;
+  let best=null, bestScore=0;
+  bank.forEach(item=>{
+    let score=0;
+    (item.keywords||[]).forEach(k=>{ if(t.includes(k)) score++; });
+    if(score>bestScore){ bestScore=score; best=item; }
+  });
+  return bestScore>0 ? best : null;
+}
+function renderPerfAsk(){
+  const el = $("view-perf-ask");
+  if(!el) return;
+  const P = getActivePerformanceView();
+  if(!P) return;
+  const bank = ASK_QUESTION_BANK[P.scope] || ASK_QUESTION_BANK.single_brand_single_platform;
+  if(!bank.find(b=>b.id===STATE.perfAskActiveId)) STATE.perfAskActiveId = bank[0].id;
+  const activeItem = bank.find(b=>b.id===STATE.perfAskActiveId);
+  const answer = activeItem.compute(P);
+  const maxBar = (answer.bars && answer.bars.length) ? Math.max(...answer.bars.map(b=>b.value),1) : 1;
+  const noMatchHTML = STATE.perfAskNoMatch
+    ? `<div class="flagnote">Couldn't match "${esc(STATE.perfAskQueryText||"")}" to a question I know how to answer yet — try one on the left, or rephrase.</div>`
+    : "";
+  el.innerHTML = `
+    <div class="pagehead-row"><div class="pagehead"><h1>Ask me</h1><p>Questions about this ${isMultiBrand(P.scope)?"portfolio's":"account's"} performance, answered from the data you loaded.</p></div></div>
+    <div class="ask-layout">
+      <div class="ask-qlist">
+        ${bank.map(item=>`<button class="ask-qbtn ${item.id===STATE.perfAskActiveId?"active":""}" data-id="${item.id}">${esc(item.q(P))}</button>`).join("")}
+      </div>
+      <div class="ask-answer-card">
+        <div class="ask-answer-label">Answer</div>
+        <p class="ask-answer-text">${esc(answer.text)}</p>
+        ${(answer.bars&&answer.bars.length) ? answer.bars.map(b=>`
+          <div class="ask-bar-row">
+            <span class="ask-bar-label" dir="auto" title="${esc(b.label)}">${esc(b.label)}</span>
+            <div class="ask-bar-track"><div class="ask-bar-fill" style="width:${Math.round(b.value/maxBar*100)}%"></div></div>
+            <span class="ask-bar-value">${fmt(b.value)}</span>
+          </div>`).join("") : ""}
+      </div>
+    </div>
+    <div class="ask-free-row">
+      <input type="text" id="askFreeInput" placeholder="Ask about your data..." value="${esc(STATE.perfAskQueryText||"")}">
+      <button id="askFreeBtn" aria-label="Ask">→</button>
+    </div>
+    ${noMatchHTML}
+    <p class="ask-hint">Try: "${esc(bank[0].q(P))}"</p>
+  `;
+  qsa(".ask-qbtn", el).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      STATE.perfAskActiveId = btn.dataset.id;
+      STATE.perfAskNoMatch = false;
+      renderPerfAsk();
+    });
+  });
+  const runFreeAsk = ()=>{
+    const val = $("askFreeInput").value;
+    STATE.perfAskQueryText = val;
+    const match = matchQuestionByText(val, bank);
+    if(match){ STATE.perfAskActiveId = match.id; STATE.perfAskNoMatch = false; }
+    else { STATE.perfAskNoMatch = true; }
+    renderPerfAsk();
+  };
+  $("askFreeBtn").addEventListener("click", runFreeAsk);
+  $("askFreeInput").addEventListener("keydown", e=>{ if(e.key==="Enter") runFreeAsk(); });
 }
 
 function renderPerfOverview(){
@@ -5579,6 +5874,7 @@ function renderPerformanceDashboard(){
   renderPerfCadence();
   if(nav.some(n=>n.id==="perf-comparison")) renderPerfComparison();
   renderPerfPosts();
+  renderPerfAsk();
   renderPerfQuality();
   animateCardsIn(root);
   animateCounters(root);
@@ -5608,6 +5904,7 @@ const PERFORMANCE_NAV_BASE = [
   {id:"perf-cadence", label:"Posting Frequency"},
   {id:"perf-comparison", label:"Comparison"},
   {id:"perf-posts", label:"Top Posts"},
+  {id:"perf-ask", label:"Ask me"},
   {id:"perf-quality", label:"Data Quality"}
 ];
 function getPerformanceNav(){
