@@ -938,7 +938,11 @@ table.datatable a.mtext{color:var(--text);}
 
 
 
-.brand-intel-grid{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;}
+.brand-intel-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start;min-width:0;}
+.brand-intel-grid > div{min-width:0;}
+.brand-intel-grid .chart-wrap{width:100%;max-width:100%;min-width:0;overflow:hidden;}
+.brand-intel-grid canvas{max-width:100%;}
+.brand-intel-chart-card{overflow-x:hidden;}
 @media(max-width:900px){.brand-intel-grid{grid-template-columns:1fr;}}
 .brand-intel-obs-label{font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text);margin-bottom:8px;}
 .brand-intel-insights ul{margin:0;padding-left:18px;}
@@ -1251,7 +1255,13 @@ const PERFORMANCE_ALIASES = {
   story_replies: ["Story Replies"],
   swipe_ups:   ["Swipe up"],
   screenshots: ["Screenshots"],
-  dislikes:    ["Insights dislike count"]
+  dislikes:    ["Insights dislike count"],
+  // UNVERIFIED — added for the LinkedIn Engagements split (see engagementsComponentsFor).
+  // Header text is a best guess following this file's "Insights ___" naming pattern
+  // (c.f. "Insights dislike count" above); needs confirming against a real LinkedIn
+  // owned-account export.
+  insights_reactions: ["Insights reactions"],
+  insights_comments:  ["Insights comments"]
 };
 
 function resolveHeaderMap(headerRow, aliasDict){
@@ -1483,19 +1493,56 @@ function platformMatches(declaredId, detectedLiteral){
    manually recomputed from likes+comments+shares.
    ============================================================ */
 function engagementMetricMode(){ return STATE.perfEngagementMetric || "interactions"; }
+// A row's account type (owned vs public) is a property of which BRAND it belongs to —
+// declared once per brand in the wizard's brand-setup step, not detected per row — see
+// STATE.performance.brandAccountType, a {brandName: "owned"|"public"} map built there.
+// Defaults to "owned" when missing (e.g. a dashboard built before this setting existed,
+// or via the standalone/baked file), which preserves the dashboard's original behavior:
+// every platform's full Interactions/Engagements formula, same as before this existed.
+function accountTypeOf(row){
+  const m = (STATE.performance && STATE.performance.brandAccountType) || {};
+  return m[row.profile] || "owned";
+}
 function engagementValueOf(r){
-  if(engagementMetricMode()==="engagements"){
-    // Instagram Stories: the raw "Engagements" column depends on an Insights
-    // connection and is unreliable/incomplete for owned-account Story rows in
-    // practice, so recombine the value from the row's own six raw component
-    // columns (the same ones engagementsComponentsFor breaks the split widget
-    // into) instead of trusting the column — keeps every widget (KPI cards,
-    // timeline, cadence, comparisons, etc.) consistent with what the split
-    // widget already shows for stories.
-    if(isInstagramStory(r)) return engagementsComponentsFor(r).reduce((a,[,v])=>a+v, 0);
-    return Number(r.engagements)||0;
-  }
+  return engagementMetricMode()==="engagements" ? engagementsValueOf(r) : interactionsValueOf(r);
+}
+// "Total Interactions" — per platform AND per account type, since a Public/competitor
+// account only exposes what's publicly visible while an Owned account has full API
+// access, and that changes which platforms even HAVE an Interactions number at all
+// (see the Public/Owned matrix this was built from). Where both account types agree,
+// the same rule is applied either way rather than repeating it.
+function interactionsValueOf(r){
+  // Confirmed against a real export: Total Interactions is blank on every single Story
+  // row regardless of platform — Emplifi simply doesn't report it for Story content.
+  if(isStoryRow(r)) return 0;
+  const p = platformKeyOf(r.platform);
+  const owned = accountTypeOf(r)==="owned";
+  // LinkedIn and TikTok only expose Interactions through an owner-level connection —
+  // for a Public/competitor account there's nothing here to report.
+  if(p==="linkedin") return owned ? (Number(r.interactions)||0) + (Number(r.shares)||0) : 0;
+  if(p==="tiktok") return owned ? (Number(r.likes)||0) + (Number(r.comments)||0) + (Number(r.shares)||0) : 0; // TikTok never populates its own Total Interactions column — reconstruct it from the raw parts instead
+  // Instagram/YouTube: identical for Public and Owned. The platform's own Total
+  // Interactions column is available either way, but consistently omits Shares, so
+  // it has to be added back in explicitly to be complete.
+  if(p==="instagram" || p==="youtube") return (Number(r.interactions)||0) + (Number(r.shares)||0);
+  // Facebook/X: the declared column is already complete on its own, any account type.
   return Number(r.interactions)||0;
+}
+// "Engagements" is an owned-account-only concept in this model — a Public/competitor
+// account's export doesn't carry real Engagements data, so a stray non-zero value in
+// one of its rows is not trusted as if it were real.
+function engagementsValueOf(r){
+  if(accountTypeOf(r)!=="owned") return 0;
+  // Every platform's own "Engagements" column omits Shares — the same documented pattern
+  // already applied to Instagram/YouTube's Total Interactions — so the real total needs
+  // Shares added back explicitly. Applied uniformly across every platform AND every
+  // content type, including Stories, per explicit direction.
+  // NOTE: checking a real Emplifi export earlier showed Instagram Stories' declared
+  // Engagements column never actually moving when Shares did (Comments matched it
+  // exactly on all 14 sample rows) — that empirical finding is superseded here by this
+  // direction to apply the same +Shares rule everywhere for consistency across the whole
+  // dashboard. Worth re-checking against a fuller export if the numbers look off for Stories.
+  return (Number(r.engagements)||0) + (Number(r.shares)||0);
 }
 function engagementMetricLabel(){ return engagementMetricMode()==="engagements" ? "Engagements" : "Total Interactions"; }
 function engagementMetricColumnLabel(){ return engagementMetricMode()==="engagements" ? "the Engagements column" : "the Total Interactions column"; }
@@ -1526,59 +1573,63 @@ function platformKeyOf(platform){
   if(d.includes("snapchat")||d==="sc") return "snapchat";
   return "unknown";
 }
-function isInstagramStory(row){
-  return platformKeyOf(row.platform)==="instagram" && String(row.content_type||"").trim().toLowerCase()==="story";
+// Story detection is defined purely by content type, not by platform — Emplifi tags a
+// row's content type as "Story" whenever it's one, regardless of which platform it's
+// on, and that's the only reliable signal (see engagement*ComponentsFor's dedicated
+// story branch below, which was rebuilt after checking a real export against the
+// dashboard's original Instagram-only assumption).
+function isStoryRow(row){
+  return String(row.content_type||"").trim().toLowerCase()==="story";
 }
 // Returns {label, value} pairs of the raw components that legitimately count toward
-// the "Total Interactions" number for this row's own platform. Anything this row's
-// platform contributes to its Interactions total but isn't broken out here (e.g.
-// TikTok/Snapchat, which Emplifi hasn't documented a component breakdown for) is left
-// for the caller to bucket as residual.
+// the "Total Interactions" number for this row's own platform and account type (see
+// interactionsValueOf — same matrix). Anything this row's platform contributes to its
+// Interactions total but isn't broken out here (Snapchat/unknown, which Emplifi hasn't
+// documented a component breakdown for) is left for the caller to bucket as residual.
 function interactionsComponentsFor(row){
+  if(isStoryRow(row)) return []; // Total Interactions isn't reported for stories at all
+  const owned = accountTypeOf(row)==="owned";
   const p = platformKeyOf(row.platform);
-  if(p==="instagram"){
-    return isInstagramStory(row)
-      ? [["Likes",Number(row.story_likes)||0],["Comments",Number(row.story_comments)||0],["Shares",Number(row.story_shares)||0]]
-      : [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]];
-  }
-  if(p==="facebook") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]];
-  if(p==="x") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]];
-  if(p==="linkedin") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0]];
-  if(p==="youtube") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Dislikes",Number(row.dislikes)||0]];
-  return []; // tiktok / snapchat / unknown: no documented breakdown — everything is residual
+  if(p==="linkedin") return owned ? [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]] : [];
+  if(p==="tiktok") return owned ? [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]] : [];
+  if(p==="instagram" || p==="facebook" || p==="x" || p==="youtube") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]];
+  return []; // snapchat / unknown: no documented breakdown — everything is residual
 }
-// Same idea for "Engagements". Instagram Stories use Emplifi's documented
-// story-specific formula (Story Replies only); everything else uses the
-// platform's own published Engagements formula.
+// Same idea for "Engagements" — an owned-account-only concept (see engagementsValueOf),
+// so a Public-account row contributes nothing here at all rather than a fabricated split.
 function engagementsComponentsFor(row){
+  if(accountTypeOf(row)!=="owned") return []; // Engagements isn't available for public accounts
+  // Stories fall through to the same per-platform list as every other content type —
+  // every platform's list below already includes Shares, matching engagementsValueOf's
+  // +Shares total, and a Story row's other fields (Likes/Saves etc.) simply read as 0
+  // since Emplifi doesn't populate them for that content type.
   const p = platformKeyOf(row.platform);
-  if(p==="instagram"){
-    return isInstagramStory(row)
-      ? [["Story Replies",Number(row.story_replies)||0],["Story likes",Number(row.story_likes)||0],
-         ["Story shares",Number(row.story_shares)||0],["Comments",Number(row.comments)||0],
-         ["Likes",Number(row.likes)||0],["Shares",Number(row.shares)||0]]
-      : [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0],["Saves",Number(row.saves)||0]];
-  }
+  if(p==="instagram") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0],["Saves",Number(row.saves)||0]];
   if(p==="facebook") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0],["Post clicks",Number(row.post_clicks)||0]];
-  if(p==="linkedin") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0],["Post clicks",Number(row.post_clicks)||0]];
+  // UNVERIFIED — per the spec given for this, LinkedIn Engagements is meant to be built
+  // from dedicated "Insights reactions"/"Insights comments" columns rather than the plain
+  // Likes/Comments columns used elsewhere. We haven't seen a real LinkedIn owned export to
+  // confirm the exact header text or that these columns exist — flagged for verification.
+  if(p==="linkedin") return [["Insights reactions",Number(row.insights_reactions)||0],["Insights comments",Number(row.insights_comments)||0],["Shares",Number(row.shares)||0],["Post clicks",Number(row.post_clicks)||0]];
   if(p==="tiktok") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]];
   if(p==="youtube") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0],["Dislikes",Number(row.dislikes)||0]];
   if(p==="snapchat") return [["Swipe ups",Number(row.swipe_ups)||0],["Shares",Number(row.shares)||0],["Comments",Number(row.comments)||0],["Screenshots",Number(row.screenshots)||0]];
-  if(p==="x") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]]; // rest (card/link/profile clicks etc.) -> residual "Clicks & other"
+  if(p==="x") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0]]; // rest (card/link/profile clicks etc.) -> residual "Other clicks (X)"
   return []; // unknown platform: everything is residual
 }
 
 /* ============================================================
    PER-WIDGET POSTS / STORIES / ALL CONTENT SCOPE
    A local, per-widget toggle (independent of the global filter bar) that lets
-   each widget look at just Instagram Stories, just everything else ("Posts"),
-   or both combined. Only rendered on a widget when the base dataset actually
-   contains Instagram Story rows.
+   each widget look at just Story-content-type rows, just everything else
+   ("Posts"), or both combined. Only rendered on a widget when the base dataset
+   actually contains Story rows (see isStoryRow — defined by content type, not
+   by platform, since Emplifi can tag a Story on more than just Instagram).
    ============================================================ */
-function hasStoriesIn(rows){ return (rows||[]).some(isInstagramStory); }
+function hasStoriesIn(rows){ return (rows||[]).some(isStoryRow); }
 function applyContentScope(rows, scope){
-  if(scope==="posts") return (rows||[]).filter(r=>!isInstagramStory(r));
-  if(scope==="stories") return (rows||[]).filter(isInstagramStory);
+  if(scope==="posts") return (rows||[]).filter(r=>!isStoryRow(r));
+  if(scope==="stories") return (rows||[]).filter(isStoryRow);
   return rows||[];
 }
 // Given a widget's already-globally-filtered view P, returns the aggregate to
@@ -1633,6 +1684,7 @@ function aggregatePerformanceRows(rows){
   const contentTypeCounter = {}; // post / shared etc (from "Content type" column)
   const mediaTypeCounter = {}, mediaTypeInteractions = {}; // photo / video / link etc (from "Media type" column)
   const followersLatest = {}; // profile -> {date, value}
+  const followersByProfilePlatform = {}; // "profile · platform" -> {date, value, profile, platform}
   const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const cadence = {Sun:0,Mon:0,Tue:0,Wed:0,Thu:0,Fri:0,Sat:0};
   const cadenceInteractions = {Sun:0,Mon:0,Tue:0,Wed:0,Thu:0,Fri:0,Sat:0};
@@ -1680,6 +1732,15 @@ function aggregatePerformanceRows(rows){
     const fv = Number(r.followers);
     if(fv>0 && d!=="unknown"){
       if(!followersLatest[p] || d >= followersLatest[p].date) followersLatest[p] = {date:d, value:fv};
+      // Followers is a per-(profile,platform) account size — an Instagram account's
+      // followers and a Facebook Page's followers for the same brand are two different
+      // numbers. Track them separately here so callers can tell "this brand's own
+      // multi-platform footprint" (their own accounts, safe to add together) apart from
+      // "this platform's account across different brands" (different companies — never
+      // add together). See computeFollowersWidgets.
+      if(!followersByProfilePlatform[combo] || d >= followersByProfilePlatform[combo].date){
+        followersByProfilePlatform[combo] = {date:d, value:fv, profile:p, platform:pf};
+      }
     }
   });
 
@@ -1716,6 +1777,20 @@ function aggregatePerformanceRows(rows){
     if(!dateMax||d>dateMax) dateMax=d;
   });
 
+  const warnings = [];
+  if(reachCovered===0 && impressionsCovered===0){
+    warnings.push("Reach and impressions are 0 for every row — this platform/API combination (commonly X/Twitter) often withholds these fields. KPIs below are limited to engagement counts (likes/comments/shares).");
+  }
+  // Engagements is an owned-account-only concept (see engagementsValueOf) — flag it
+  // rather than silently showing 0s for brands declared Public in the wizard, so it
+  // reads as "this metric doesn't apply here" instead of looking like missing data.
+  if(engagementMetricMode()==="engagements"){
+    const publicProfiles = Array.from(new Set(rows.filter(r=>accountTypeOf(r)!=="owned").map(r=>r.profile||"Unknown")));
+    if(publicProfiles.length){
+      warnings.push(`Engagements isn't available for Public accounts — ${publicProfiles.join(", ")} will show 0 for this metric. Switch to Total Interactions, or exclude ${publicProfiles.length>1?"these brands":"this brand"} for a complete Engagements total.`);
+    }
+  }
+
   return {
     byProfile: Object.values(byProfile),
     byPlatform: Object.values(byPlatform),
@@ -1724,12 +1799,169 @@ function aggregatePerformanceRows(rows){
     dailyPostsTotal, dailyInteractionsTotal,
     contentType: contentTypeCounter,
     mediaType: mediaTypeCounter, mediaTypeInteractions, mediaTypeStats,
-    followersLatest, cadence, cadenceInteractions, topPosts, totals,
+    followersLatest, followersByProfilePlatform, cadence, cadenceInteractions, topPosts, totals,
     reachCovered, impressionsCovered, engagementCovered, date_from:dateMin, date_to:dateMax,
     rowCount: rows.length,
-    warnings: (reachCovered===0 && impressionsCovered===0) ?
-      ["Reach and impressions are 0 for every row — this platform/API combination (commonly X/Twitter) often withholds these fields. KPIs below are limited to engagement counts (likes/comments/shares)."] : []
+    warnings
   };
+}
+
+/* ============================================================
+   PROFILE FOLLOWERS WIDGET — scope-aware, never blends different
+   companies' audiences into one number.
+     1 brand  · 1 platform   -> that one account's own number.
+     1 brand  · many platforms -> the brand's OWN total across its OWN
+       channels (one organization's own accounts — a real, meaningful
+       "total footprint" figure) with a % breakdown per platform.
+     many brands · 1 platform  -> never blend different companies'
+       audiences. Show the top-followed brand on this platform, and
+       list every other brand's own count underneath (no percentages
+       — they're unrelated audiences, not parts of one whole).
+     many brands · many platforms -> two separate widgets, each still
+       never blending different brands together: (1) the leading brand
+       by its own cross-platform total, with other brands' own totals
+       listed, and (2) the leading platform, found by summing that one
+       platform's followers across the brands that use it, with other
+       platforms' totals listed.
+   ============================================================ */
+function computeFollowersWidgets(rows){
+  const agg = aggregatePerformanceRows(rows||[]);
+  const combos = Object.values(agg.followersByProfilePlatform||{});
+  if(!combos.length) return [{ mode:"empty" }];
+
+  const profiles = Array.from(new Set(combos.map(c=>c.profile)));
+  const platforms = Array.from(new Set(combos.map(c=>c.platform)));
+
+  if(profiles.length<=1 && platforms.length<=1){
+    return [{ mode:"single", value: combos[0].value }];
+  }
+
+  if(profiles.length===1 && platforms.length>1){
+    const sorted = [...combos].sort((a,b)=>b.value-a.value);
+    const total = sorted.reduce((a,c)=>a+c.value,0);
+    return [{
+      mode:"brand-platforms",
+      total,
+      breakdown: sorted.map(c=>({ platform:c.platform, value:c.value, pct: total ? Math.round(c.value/total*1000)/10 : 0 }))
+    }];
+  }
+
+  if(profiles.length>1 && platforms.length===1){
+    const sorted = [...combos].sort((a,b)=>b.value-a.value);
+    return [{
+      mode:"top-brand",
+      top: { profile: sorted[0].profile, value: sorted[0].value },
+      others: sorted.slice(1).map(c=>({ profile:c.profile, value:c.value }))
+    }];
+  }
+
+  // many brands, many platforms -> two widgets, each summed only within its own
+  // safe dimension (a brand's own platforms, or a platform's own... wait, platform
+  // totals below DO span multiple brands' accounts on that one platform by design —
+  // that's the deliberate "leading platform across our whole portfolio" metric the
+  // brand-intel view calls for. It's still never mixed with the brand-total widget.
+  const profileTotals = {}, platformTotals = {};
+  combos.forEach(c=>{
+    profileTotals[c.profile] = (profileTotals[c.profile]||0) + c.value;
+    platformTotals[c.platform] = (platformTotals[c.platform]||0) + c.value;
+  });
+  const profileSorted = Object.entries(profileTotals).sort((a,b)=>b[1]-a[1]);
+  const platformSorted = Object.entries(platformTotals).sort((a,b)=>b[1]-a[1]);
+
+  return [
+    {
+      mode:"top-brand-multiplatform",
+      top: { profile: profileSorted[0][0], value: profileSorted[0][1] },
+      others: profileSorted.slice(1).map(([profile,value])=>({profile,value}))
+    },
+    {
+      mode:"top-platform-multibrand",
+      top: { platform: platformSorted[0][0], value: platformSorted[0][1] },
+      others: platformSorted.slice(1).map(([platform,value])=>({platform,value}))
+    }
+  ];
+}
+// Full KPI-card markup (used on the Overview page) for one followers widget model.
+function followersKpiCardHTML(widget){
+  const chrome = kpiIconHTML("followers") + kpiCompareBtnHTML("followers","Profile followers");
+  if(widget.mode==="empty"){
+    return `<div class="card kpi kpi-accent-orange">${chrome}<div class="label">Profile followers</div><div class="value">—</div>
+      <div class="foot">not reported in this export</div></div>`;
+  }
+  if(widget.mode==="single"){
+    return `<div class="card kpi kpi-accent-orange">${chrome}<div class="label">Profile followers</div><div class="value" dir="auto">${fmtSpan(widget.value)}</div>
+      <div class="foot">latest known snapshot</div></div>`;
+  }
+  if(widget.mode==="brand-platforms"){
+    const foot = widget.breakdown.map(b=>`${b.pct}% on ${platformIconHTML(b.platform)} ${esc(cap(b.platform))} (${fmt(b.value)})`).join(' · ');
+    return `<div class="card kpi kpi-accent-orange">${chrome}<div class="label">Profile followers (all platforms)</div><div class="value" dir="auto">${fmtSpan(widget.total)}</div>
+      <div class="foot" dir="auto">${foot}</div></div>`;
+  }
+  if(widget.mode==="top-brand"){
+    const foot = widget.others.length ? widget.others.map(o=>`${esc(o.profile)}: ${fmt(o.value)}`).join(' · ') : 'only brand reporting followers on this platform';
+    return `<div class="card kpi kpi-accent-orange">${chrome}<div class="label">Top followed brand</div><div class="value" dir="auto">${esc(widget.top.profile)} — ${fmtSpan(widget.top.value)}</div>
+      <div class="foot" dir="auto">${foot}</div></div>`;
+  }
+  if(widget.mode==="top-brand-multiplatform"){
+    const foot = widget.others.length ? widget.others.map(o=>`${esc(o.profile)}: ${fmt(o.value)}`).join(' · ') : 'only brand reporting followers';
+    return `<div class="card kpi kpi-accent-orange">${chrome}<div class="label">Leading brand — total followers</div><div class="value" dir="auto">${esc(widget.top.profile)} — ${fmtSpan(widget.top.value)}</div>
+      <div class="foot" dir="auto">${foot}</div></div>`;
+  }
+  if(widget.mode==="top-platform-multibrand"){
+    const foot = widget.others.length ? widget.others.map(o=>`${platformIconHTML(o.platform)} ${esc(cap(o.platform))}: ${fmt(o.value)}`).join(' · ') : 'only one platform reporting followers';
+    return `<div class="card kpi kpi-accent-orange">${chrome}<div class="label">Leading platform — total followers</div><div class="value" dir="auto">${platformIconHTML(widget.top.platform)} ${esc(cap(widget.top.platform))} — ${fmtSpan(widget.top.value)}</div>
+      <div class="foot" dir="auto">${foot}</div></div>`;
+  }
+  return "";
+}
+// Compact markup (used inside the Compare brands/platforms modal's mini tiles) for
+// one followers widget model. Multiple models (the many-brands-many-platforms case)
+// are stacked in the same tile, separated by a thin divider.
+function followersMiniHTML(widget){
+  if(widget.mode==="empty") return `<div style="font-size:22px;font-weight:800">—</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Profile followers</div>`;
+  if(widget.mode==="single") return `<div style="font-size:22px;font-weight:800">${fmtSpan(widget.value)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Profile followers</div>`;
+  if(widget.mode==="brand-platforms"){
+    const foot = widget.breakdown.map(b=>`${b.pct}% ${esc(cap(b.platform))} (${fmt(b.value)})`).join(' · ');
+    return `<div style="font-size:22px;font-weight:800">${fmtSpan(widget.total)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Profile followers (all platforms)</div><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px" dir="auto">${foot}</div>`;
+  }
+  if(widget.mode==="top-brand" || widget.mode==="top-brand-multiplatform"){
+    const label = widget.mode==="top-brand" ? "Top followed brand" : "Leading brand — total followers";
+    const foot = widget.others.length ? widget.others.map(o=>`${esc(o.profile)}: ${fmt(o.value)}`).join(' · ') : 'no other brands to list';
+    return `<div style="font-size:18px;font-weight:800" dir="auto">${esc(widget.top.profile)} — ${fmtSpan(widget.top.value)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${label}</div><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px" dir="auto">${foot}</div>`;
+  }
+  if(widget.mode==="top-platform-multibrand"){
+    const foot = widget.others.length ? widget.others.map(o=>`${esc(cap(o.platform))}: ${fmt(o.value)}`).join(' · ') : 'no other platforms to list';
+    return `<div style="font-size:18px;font-weight:800" dir="auto">${esc(cap(widget.top.platform))} — ${fmtSpan(widget.top.value)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Leading platform — total followers</div><div style="font-size:10.5px;color:var(--text-muted);margin-top:4px" dir="auto">${foot}</div>`;
+  }
+  return "";
+}
+
+// Excel-export shape for one or two followers widget models — a flat, consistent
+// 3-column sheet (Metric / Entity / Followers) regardless of which scope case produced
+// the models, so the export never has to guess at column meaning.
+function followersWidgetsToAOA(widgets){
+  const rows = [];
+  (widgets||[]).forEach(w=>{
+    if(w.mode==="empty"){ rows.push(["Profile followers","not reported in this export",""]); return; }
+    if(w.mode==="single"){ rows.push(["Profile followers (latest known)","",w.value]); return; }
+    if(w.mode==="brand-platforms"){
+      rows.push(["Profile followers — total across platforms","",w.total]);
+      w.breakdown.forEach(b=> rows.push(["  share of total", cap(b.platform), b.value]));
+      return;
+    }
+    if(w.mode==="top-brand" || w.mode==="top-brand-multiplatform"){
+      const label = w.mode==="top-brand" ? "Top followed brand" : "Leading brand — total followers";
+      rows.push([label, w.top.profile, w.top.value]);
+      w.others.forEach(o=> rows.push(["Other brand", o.profile, o.value]));
+      return;
+    }
+    if(w.mode==="top-platform-multibrand"){
+      rows.push(["Leading platform — total followers", cap(w.top.platform), w.top.value]);
+      w.others.forEach(o=> rows.push(["Other platform", cap(o.platform), o.value]));
+      return;
+    }
+  });
+  return [["Metric","Entity","Followers"], ...rows];
 }
 
 function deriveEntityLists(rows){
@@ -2497,9 +2729,12 @@ function renderPerfOverview(){
   const P = showScopeToggle ? contentScopeAgg(base, contentScope) : base;
   const t = P.totals||{posts:0,reach:0,impressions:0,engagement:0,likes:0,comments:0,shares:0,video_views:0};
   const declared = P.declared||{};
-  const storiesCount = (base.rowsData||[]).filter(isInstagramStory).length;
-  const followersVals = Object.values(P.followersLatest||{});
-  const followersTotal = followersVals.reduce((a,f)=>a+f.value,0);
+  const storiesCount = (base.rowsData||[]).filter(isStoryRow).length;
+  // Hard rule: never sum followers/audience across profiles — each is a separate account's
+  // own size, not an additive quantity like reach or engagement. Show the single value when
+  // there's exactly one profile; otherwise list each profile's own count instead of blending
+  // them into one meaningless total.
+  const followersWidgets = computeFollowersWidgets(P.rowsData||[]);
   const mt = P.mediaTypeStats;
   const ctEntries = Object.entries(P.contentType||{}).sort((a,b)=>b[1]-a[1]);
   const ctTop = ctEntries[0];
@@ -2542,7 +2777,7 @@ function renderPerfOverview(){
         ${leadingPlatformTopBrand?`<div class="foot" style="margin-top:2px" dir="auto">Top brand: ${esc(leadingPlatformTopBrand.profile)} · ${leadingPlatformTopBrand.pct}% of the platform's ${esc(engagementMetricLabel().toLowerCase())}</div>`:""}</div>`:""}
       <div class="card kpi">${kpiIconHTML("posts")}${kpiCompareBtnHTML("posts","Total posts")}<div class="label">Total posts</div><div class="value">${fmtSpan(t.posts)}</div>
         <div class="foot">${P.date_from?`${formatDatePretty(P.date_from)} → ${formatDatePretty(P.date_to)}`:"&nbsp;"}</div>
-        ${(storiesCount>0 && contentScope==="all")?`<div class="foot" style="margin-top:2px">${fmt(storiesCount)} of ${fmt(t.posts)} posts are Instagram Stories</div>`:""}</div>
+        ${(storiesCount>0 && contentScope==="all")?`<div class="foot" style="margin-top:2px">${fmt(storiesCount)} of ${fmt(t.posts)} posts are Stories</div>`:""}</div>
       <div class="card kpi">${kpiIconHTML("engagement")}${kpiCompareBtnHTML("engagement",engagementMetricLabel())}<div class="label">${esc(engagementMetricLabel())}</div><div class="value">${fmtSpan(t.engagement)}</div>
         <div class="foot">read from ${engagementMetricColumnLabel()}</div></div>
       <div class="card kpi">${kpiIconHTML("avg_engagement")}${kpiCompareBtnHTML("avg_engagement",metricLabel("avg_engagement"))}<div class="label">${esc(metricLabel("avg_engagement"))}</div><div class="value">${fmtSpan(t.posts?t.engagement/t.posts:0)}</div>
@@ -2563,23 +2798,45 @@ function renderPerfOverview(){
         <div class="foot">${mt?`${fmt(mt.posts)} posts · ${fmt(mt.interactions)} ${esc(engagementMetricLabel().toLowerCase())} · ${fmt(mt.avgPerPost)} avg/post`:"no media-type data"}</div></div>
       <div class="card kpi">${kpiIconHTML("content_type")}${kpiCompareBtnHTML("content_type","Dominant content type","dominant")}<div class="label">Dominant content type</div><div class="value">${ctTop?esc(ctTop[0]):"—"}</div>
         <div class="foot">${ctBreakdown||"no content-type data"}</div></div>
-      <div class="card kpi kpi-accent-orange">${kpiIconHTML("followers")}${kpiCompareBtnHTML("followers","Profile followers")}<div class="label">Profile followers</div><div class="value">${followersVals.length?fmtSpan(followersTotal):"—"}</div>
-        <div class="foot">${followersVals.length?'latest known snapshot per profile':'not reported in this export'}</div></div>
+      ${followersWidgets.map(followersKpiCardHTML).join("")}
     </div>
     ${P.platforms.length>1 ? (()=>{
+      // Two bars per platform, not one — a platform can lead on posting volume and
+      // still trail on the metric that actually matters, so the widget needs to say
+      // explicitly which of the two each bar measures rather than leaving "breakdown"
+      // ambiguous about whether it's counting posts or engagement.
+      const engLabel = engagementMetricLabel();
       const totalPosts = t.posts||1;
+      const totalEng = t.engagement||1;
       const maxPosts = Math.max(1, ...P.byPlatform.map(x=>x.posts));
+      const maxEng = Math.max(1, ...P.byPlatform.map(x=>x.engagement));
       const sorted = [...P.byPlatform].sort((a,b)=>b.posts-a.posts);
-      return `<div class="card" style="margin-top:16px"><h3>Platforms breakdown</h3><div class="barlist">
-        ${sorted.map(p=>{
-          const pctVal = Math.round(p.posts/totalPosts*1000)/10;
-          return `<div class="row"><div class="lbl">${platformIconHTML(p.platform)} ${esc(p.platform)}</div>
-            <div class="track"><div class="fill" style="width:${(p.posts/maxPosts*100)}%"></div></div>
-            <div class="num">${fmt(p.posts)} (${pctVal}%)</div></div>`;
+      return `<div class="card" style="margin-top:16px"><h3>Platforms breakdown — Posts &amp; ${esc(engLabel)}</h3><div class="barlist">
+        ${sorted.map((p,i)=>{
+          const postsPct = Math.round(p.posts/totalPosts*1000)/10;
+          const engPct = Math.round(p.engagement/totalEng*1000)/10;
+          const groupStyle = i<sorted.length-1 ? ' style="border-bottom:1px solid var(--card-border);padding-bottom:6px;margin-bottom:6px"' : "";
+          return `<div${groupStyle}>
+            <div class="row"><div class="lbl" title="${esc(p.platform)}">${platformIconHTML(p.platform)} Posts</div>
+              <div class="track"><div class="fill" style="width:${(p.posts/maxPosts*100)}%"></div></div>
+              <div class="num">${fmt(p.posts)} (${postsPct}%)</div></div>
+            <div class="row"><div class="lbl" style="padding-left:22px;color:var(--text-muted);font-size:9.5px;line-height:1.2" title="${esc(engLabel)}">${esc(engLabel)}</div>
+              <div class="track"><div class="fill" style="width:${(p.engagement/maxEng*100)}%;background:#3b82f6"></div></div>
+              <div class="num">${fmt(p.engagement)} (${engPct}%)</div></div>
+          </div>`;
         }).join("")}
       </div></div>`;
     })() : ""}`;
   if(showScopeToggle) bindContentScopeToggles($("view-perf-overview"), renderPerfOverview);
+  // renderPerfOverview is invoked both by the full renderPerformanceDashboard() rebuild
+  // (which already animates the whole root afterward) and directly by its own local
+  // Posts/Stories/All content-scope toggle above — the latter never triggered the
+  // page-level animateCounters(root) pass, so every count-up KPI card (including the
+  // followers card(s)) stayed frozen at "0" after switching scope until some unrelated
+  // action (e.g. changing the global engagement metric) forced a full rebuild. Animating
+  // this view's own container here covers both call paths.
+  animateCardsIn($("view-perf-overview"));
+  animateCounters($("view-perf-overview"));
 }
 
 function exportOverviewSection(config){
@@ -2592,7 +2849,9 @@ function exportOverviewSection(config){
   ];
   const sheets = kpiDefs.map(([label,key])=>makeSheet(label, blocksToAOA(entityBreakdownBlocks(P,key)), config));
 
-  sheets.push(makeSheet("Profile followers", [["Profile","Followers"], ...Object.entries(P.followersLatest||{}).map(([k,v])=>[k, v.value])], config));
+  // Same scope-aware logic as the Overview KPI card(s) — never blend different brands'
+  // audiences into one summed number, but do total a single brand's OWN platforms.
+  sheets.push(makeSheet("Profile followers", followersWidgetsToAOA(computeFollowersWidgets(P.rowsData||[])), config));
 
   const mtEntries = Object.entries(P.mediaType||{}).sort((a,b)=>b[1]-a[1]);
   sheets.push(makeSheet("Dominant media type", [["Media type","Posts",engagementMetricLabel(),"Avg per post"],
@@ -2847,29 +3106,48 @@ function exportTimelineSection(config){
 const SPLIT_SLICE_COLORS = {
   "Likes":"#07B782", "Comments":"#3b82f6", "Shares":"#f59e0b", "Saves":"#a855f7",
   "Post clicks":"#ec4899", "Dislikes":"#ef4444", "Swipe ups":"#0ea5e9", "Screenshots":"#14b8a6",
-  "Story Replies":"#8b5cf6", "Story likes":"#c4b5fd", "Story shares":"#fcd34d", "Clicks & other":"#94a3b8"
+  "Story Replies":"#8b5cf6", "Story likes":"#c4b5fd", "Story shares":"#fcd34d"
 };
+const SPLIT_SLICE_RESIDUAL_COLOR = "#94a3b8";
 const SPLIT_SLICE_FALLBACK_COLORS = ["#07B782","#3b82f6","#f59e0b","#a855f7","#ec4899","#0ea5e9","#14b8a6"];
+// Platform-specific name for whatever a platform's declared Engagements/Interactions
+// total includes that isn't broken out by interactionsComponentsFor/engagementsComponentsFor.
+// X is the one documented case (its total includes card/link/profile clicks Emplifi
+// doesn't expose as separate columns); any other platform landing here is one Emplifi
+// hasn't published a component breakdown for at all.
+function residualSliceLabelFor(platformKey){
+  if(platformKey==="x") return "Other clicks (X)";
+  return `Other engagements (${cap(platformKey)})`;
+}
 // Builds the Interactions/Engagements Split pie's labels/data/colors by attributing
 // each row's own raw component columns per ITS OWN platform's documented Emplifi
 // formula (interactionsComponentsFor/engagementsComponentsFor) — never a blind sum
 // across every column for every row regardless of platform. Whatever a platform's
-// declared total includes that isn't broken out here (e.g. X's card/link/profile
-// clicks, or any platform Emplifi hasn't documented a component breakdown for) is
-// bucketed into an honest "Clicks & other" slice, shown only when it's positive.
+// declared total includes that isn't broken out here is tracked per-platform and
+// named after the platform(s) it actually came from — never a vague, unattributed
+// "other" bucket — and shown only when it's positive.
 function engagementSplitSlices(rows){
   const isEng = engagementMetricMode()==="engagements";
   const componentsFor = isEng ? engagementsComponentsFor : interactionsComponentsFor;
   const totals = {};
   const order = [];
   let attributedSum = 0, declaredTotal = 0;
+  const residualByPlatform = {};
   (rows||[]).forEach(r=>{
-    declaredTotal += engagementValueOf(r);
+    const rowTotal = engagementValueOf(r);
+    declaredTotal += rowTotal;
+    let rowAttributed = 0;
     componentsFor(r).forEach(([label,val])=>{
       if(!totals.hasOwnProperty(label)){ totals[label] = 0; order.push(label); }
       totals[label] += val;
       attributedSum += val;
+      rowAttributed += val;
     });
+    const rowResidual = rowTotal - rowAttributed;
+    if(rowResidual > 0){
+      const pk = platformKeyOf(r.platform);
+      residualByPlatform[pk] = (residualByPlatform[pk]||0) + rowResidual;
+    }
   });
   const labels = [], data = [], colors = [];
   order.forEach(label=>{
@@ -2877,39 +3155,59 @@ function engagementSplitSlices(rows){
     data.push(totals[label]);
     colors.push(SPLIT_SLICE_COLORS[label] || SPLIT_SLICE_FALLBACK_COLORS[labels.length % SPLIT_SLICE_FALLBACK_COLORS.length]);
   });
+  // Cross-check against the aggregate residual (declaredTotal - attributedSum) — should
+  // match the sum of residualByPlatform up to floating-point noise; fall back to the
+  // aggregate figure under a generic label if they ever disagree so nothing goes missing.
   const residual = declaredTotal - attributedSum;
   if(residual > 0){
-    labels.push("Clicks & other");
-    data.push(residual);
-    colors.push(SPLIT_SLICE_COLORS["Clicks & other"]);
+    const platformKeys = Object.keys(residualByPlatform).filter(k=>residualByPlatform[k]>0);
+    if(platformKeys.length===1){
+      labels.push(residualSliceLabelFor(platformKeys[0]));
+      data.push(residual);
+      colors.push(SPLIT_SLICE_RESIDUAL_COLOR);
+    } else if(platformKeys.length>1){
+      platformKeys.sort((a,b)=>residualByPlatform[b]-residualByPlatform[a]).forEach(pk=>{
+        labels.push(residualSliceLabelFor(pk));
+        data.push(residualByPlatform[pk]);
+        colors.push(SPLIT_SLICE_RESIDUAL_COLOR);
+      });
+    } else {
+      labels.push("Other engagements");
+      data.push(residual);
+      colors.push(SPLIT_SLICE_RESIDUAL_COLOR);
+    }
   }
   if(!labels.length){ labels.push("No data"); data.push(0); colors.push("#94a3b8"); }
   return {labels, data, colors};
 }
 function renderPerfEngagement(){
-  const P = getActivePerformanceView();
+  const base = getActivePerformanceView();
+  const showScopeToggle = hasStoriesIn(base.rowsData||[]);
+  const contentScope = STATE.perfEngagementContentScope || "all";
+  const P = showScopeToggle ? contentScopeAgg(base, contentScope) : base;
   const t = P.totals||{likes:0,comments:0,shares:0,saves:0,post_clicks:0,engagement:0};
   const isEng = engagementMetricMode()==="engagements";
   const ctPosts = Object.entries(P.mediaType||{}).sort((a,b)=>b[1]-a[1]);
   const ctInteractions = Object.entries(P.mediaTypeInteractions||{}).sort((a,b)=>b[1]-a[1]);
   const allRows = P.rowsData||[];
-  const storyRows = allRows.filter(isInstagramStory);
+  const storyRows = allRows.filter(isStoryRow);
   const hasStories = storyRows.length>0;
-  const postsEngagement = hasStories ? allRows.filter(r=>!isInstagramStory(r)).reduce((a,r)=>a+engagementValueOf(r),0) : null;
+  const postsEngagement = hasStories ? allRows.filter(r=>!isStoryRow(r)).reduce((a,r)=>a+engagementValueOf(r),0) : null;
   const storiesEngagement = hasStories ? storyRows.reduce((a,r)=>a+engagementValueOf(r),0) : null;
 
   $("view-perf-engagement").innerHTML = `
     <div class="pagehead-row"><div class="pagehead"><h1>${esc(engagementMetricLabel())}</h1><p>Composition of ${esc(engagementMetricLabel().toLowerCase())}, and which media type drives it.</p></div>${exportBtnHTML("engagements")}</div>
-    ${hasStories ? `<div class="grid grid-3" style="margin-bottom:16px">
+    ${showScopeToggle?contentScopeToggleHTML("perfEngagementContentScope"):""}
+    ${(hasStories && contentScope==="all") ? `<div class="grid grid-3" style="margin-bottom:16px">
       <div class="card kpi"><div class="label">Total ${esc(engagementMetricLabel().toLowerCase())}</div><div class="value">${fmtSpan(t.engagement)}</div>
-        <div class="foot">Posts + Instagram Stories combined</div></div>
+        <div class="foot">Posts + Stories combined</div></div>
       <div class="card kpi"><div class="label">Posts ${esc(engagementMetricLabel().toLowerCase())}</div><div class="value">${fmtSpan(postsEngagement)}</div>
-        <div class="foot">Everything that isn't an Instagram Story</div></div>
+        <div class="foot">Everything that isn't a Story</div></div>
       <div class="card kpi"><div class="label">Stories ${esc(engagementMetricLabel().toLowerCase())}</div><div class="value">${fmtSpan(storiesEngagement)}</div>
-        <div class="foot">${fmt(storyRows.length)} Instagram Stories in scope</div></div>
+        <div class="foot">${fmt(storyRows.length)} Stories in scope</div></div>
     </div>` : ""}
     <div class="grid grid-3">
-      <div class="card"><div class="card-head-row"><h3>${esc(engagementMetricLabel())} split</h3>${compareBtnHTML("engagement-pie","Engagement split")}</div><div class="chart-wrap short"><canvas id="perfEngagementPie"></canvas></div><div class="pie-legend-row" id="perfEngagementPieLegend"></div></div>
+      <div class="card"><div class="card-head-row"><h3>${esc(engagementMetricLabel())} split</h3>${compareBtnHTML("engagement-pie","Engagements split")}</div><div class="chart-wrap short"><canvas id="perfEngagementPie"></canvas></div><div class="pie-legend-row" id="perfEngagementPieLegend"></div></div>
       <div class="card"><div class="card-head-row"><h3>Media type — by posts</h3>${compareBtnHTML("media-posts","Media type — by posts")}</div><div class="chart-wrap short"><canvas id="perfMediaPostsChart"></canvas></div></div>
       <div class="card"><div class="card-head-row"><h3>Media type — by ${esc(engagementMetricLabel().toLowerCase())}</h3>${compareBtnHTML("media-interactions","Media type — by "+engagementMetricLabel())}</div><div class="chart-wrap short"><canvas id="perfMediaInteractionsChart"></canvas></div></div>
     </div>`;
@@ -2957,23 +3255,32 @@ function renderPerfEngagement(){
       } },
     plugins:[barValueLabelsPlugin]
   });
+  if(showScopeToggle) bindContentScopeToggles($("view-perf-engagement"), renderPerfEngagement);
+  // This view's own local content-scope toggle re-renders by calling this function
+  // directly (not the full renderPerformanceDashboard() rebuild), which never triggers
+  // the page-level animateCounters(root) pass — same class of bug already fixed on the
+  // Overview page. Animate this view's own container here so its count-up KPI cards
+  // (Total/Posts/Stories engagements) never freeze at "0" after switching scope.
+  animateCardsIn($("view-perf-engagement"));
+  animateCounters($("view-perf-engagement"));
 }
 
 function exportEngagementsSection(config){
-  const P = computeExportP(config);
+  const contentScope = STATE.perfEngagementContentScope || "all";
+  const P = contentScopeAgg(computeExportP(config), contentScope);
   const t = P.totals||{likes:0,comments:0,shares:0,saves:0,post_clicks:0,engagement:0};
   const ctPosts = Object.entries(P.mediaType||{}).sort((a,b)=>b[1]-a[1]);
   const ctInteractions = Object.entries(P.mediaTypeInteractions||{}).sort((a,b)=>b[1]-a[1]);
   const allRows = P.rowsData||[];
-  const storyRows = allRows.filter(isInstagramStory);
+  const storyRows = allRows.filter(isStoryRow);
   const slices = engagementSplitSlices(allRows);
   const sheets = [
-    makeSheet(`${engagementMetricLabel()} split`, [["Metric","Value"], ...slices.labels.map((l,i)=>[l, slices.data[i]])], config),
-    makeSheet("Media type - by posts", [["Media type","Posts"], ...ctPosts.map(([k,v])=>[cap(k), v])], config),
-    makeSheet(`Media type - by ${engagementMetricLabel()}`, [["Media type",engagementMetricLabel()], ...ctInteractions.map(([k,v])=>[cap(k), v])], config)
+    makeSheet(`${engagementMetricLabel()} split`, [["Metric","Value"], ...slices.labels.map((l,i)=>[l, slices.data[i]])], config, [["Content scope", cap(contentScope)]]),
+    makeSheet("Media type - by posts", [["Media type","Posts"], ...ctPosts.map(([k,v])=>[cap(k), v])], config, [["Content scope", cap(contentScope)]]),
+    makeSheet(`Media type - by ${engagementMetricLabel()}`, [["Media type",engagementMetricLabel()], ...ctInteractions.map(([k,v])=>[cap(k), v])], config, [["Content scope", cap(contentScope)]])
   ];
-  if(storyRows.length){
-    const postsEngagement = allRows.filter(r=>!isInstagramStory(r)).reduce((a,r)=>a+engagementValueOf(r),0);
+  if(storyRows.length && contentScope==="all"){
+    const postsEngagement = allRows.filter(r=>!isStoryRow(r)).reduce((a,r)=>a+engagementValueOf(r),0);
     const storiesEngagement = storyRows.reduce((a,r)=>a+engagementValueOf(r),0);
     sheets.unshift(makeSheet("Posts vs Stories", [["Scope",engagementMetricLabel()],
       ["Total (Posts + Stories)", t.engagement],
@@ -3127,8 +3434,8 @@ function paintMiniChart(kind, canvasId, rows, opts, entityColor, platformColorMa
 }
 
 const KPI_METRIC_LABELS = {
-  posts:"Posts", reach:"Reach", impressions:"Impressions", engagement:"Engagement",
-  avg_engagement:"Avg engagement / post", likes:"Reactions", comments:"Comments", shares:"Shares",
+  posts:"Posts", reach:"Reach", impressions:"Impressions", engagement:"Engagements",
+  avg_engagement:"Avg engagements / post", likes:"Reactions", comments:"Comments", shares:"Shares",
   video_views:"Video views", followers:"Profile followers"
 };
 
@@ -3153,7 +3460,7 @@ function exportMetaLines(config){
       ["Platform(s)", asLabel(normalizeFilterVal(f.platform), "All platforms")],
       ["Content type filter", asLabel(normalizeFilterVal(f.content_type), "All content types")],
       ["Media type filter", asLabel(normalizeFilterVal(f.media_type), "All media types")],
-      ["Engagement metric used", engagementMetricLabel()]
+      ["Engagements metric used", engagementMetricLabel()]
     ];
   }
   const brandsLabel = (!config.brands || !config.brands.length || config.brands.includes("all")) ? "All brands" : config.brands.join(", ");
@@ -3417,13 +3724,23 @@ function paintMiniKpi(containerId, rows, metricKey, breakdownField){
   if(!el) return;
   const agg = aggregatePerformanceRows(rows);
   const t = agg.totals;
+
+  // Same scope-aware logic as the Overview KPI card (computeFollowersWidgets) — this
+  // tile can be asked to render "All brands"/"All platforms" (rows spanning multiple
+  // profiles and/or platforms), so it needs the exact same never-blend-different-
+  // companies handling, not a plain sum.
+  if(metricKey==="followers"){
+    const widgets = computeFollowersWidgets(rows);
+    el.innerHTML = widgets.map(followersMiniHTML).join('<div style="height:1px;background:var(--card-border);margin:10px 0"></div>');
+    return;
+  }
+
   let val;
   if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
-  else if(metricKey==="followers"){ const fv=Object.values(agg.followersLatest||{}); val = fv.reduce((a,f)=>a+f.value,0); }
   else val = t[metricKey]||0;
 
   let breakdownHTML = "";
-  if(breakdownField && metricKey!=="followers"){
+  if(breakdownField){
     const list = breakdownField==="platform" ? (agg.byPlatform||[]) : (agg.byProfile||[]);
     const labelKey = breakdownField==="platform" ? "platform" : "profile";
     if(list.length>1){
@@ -3509,8 +3826,11 @@ function renderWidgetCompareBody(){
   const entities = axisFilterVal!=="all" ? [axisFilterVal] : allEntitiesForAxis;
   const entries = axisFilterVal!=="all" ? entities : ["all", ...entities];
   const dimLabel = dimension==="brand" ? "brand" : "platform";
-  const showScopeToggle = hasStoriesIn(base.rowsData||[]);
-  const contentScope = STATE.compareContentScope || "all";
+  // Profile followers is a point-in-time account size, not a per-post/per-story metric —
+  // the Posts/Stories content-scope toggle doesn't apply to it and would be misleading here.
+  const isFollowersMetric = opts && opts.metricKey==="followers";
+  const showScopeToggle = !isFollowersMetric && hasStoriesIn(base.rowsData||[]);
+  const contentScope = isFollowersMetric ? "all" : (STATE.compareContentScope || "all");
   const baseRows = applyContentScope(filterPerformanceRows(base.rowsData||[], filter), contentScope);
   const allBrands = base.profiles||[];
   const allPlatforms = base.platforms||[];
@@ -3634,11 +3954,16 @@ function exportCompareWidget(config){
       const agg = aggregatePerformanceRows(rows);
       const metricKey = opts && opts.metricKey;
       const t = agg.totals;
-      let val;
-      if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
-      else if(metricKey==="followers"){ const fv=Object.values(agg.followersLatest||{}); val = fv.reduce((a,f)=>a+f.value,0); }
-      else val = t[metricKey]||0;
-      aoa = [["Metric","Value"],[metricLabel(metricKey), val]];
+      if(metricKey==="followers"){
+        // Same scope-aware logic as the Overview KPI card and the Compare mini-tile —
+        // never blend different brands' audiences into one summed number.
+        aoa = followersWidgetsToAOA(computeFollowersWidgets(rows));
+      } else {
+        let val;
+        if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
+        else val = t[metricKey]||0;
+        aoa = [["Metric","Value"],[metricLabel(metricKey), val]];
+      }
     } else if(kind==="dominant"){
       const field = opts && opts.metricKey;
       const counts = {};
@@ -4554,7 +4879,7 @@ function renderBrandIntelBundleHTML(P){
         <div class="brand-intel-insights">${brandIntelTableInsightsHTML(slices, metricLbl)}</div>
       </div>
     </div>
-    <div class="card" style="margin-bottom:16px">
+    <div class="card brand-intel-chart-card" style="margin-bottom:16px">
       <h3>Monthly Interactions Trend</h3>
       <p class="sub" style="margin:-4px 0 12px">Interactions per month — trajectory matters more than totals</p>
       <div class="brand-intel-grid">
@@ -4984,14 +5309,14 @@ function closePostDetail(){
 }
 
 function renderPerfQuality(){
-  const base = getActivePerformanceView();
-  const showScopeToggle = hasStoriesIn(base.rowsData||[]);
-  const contentScope = STATE.perfQualityContentScope || "all";
-  const P = showScopeToggle ? contentScopeAgg(base, contentScope) : base;
+  // Data Quality reports on the whole declared/detected setup and coverage of the file
+  // as a whole — a Posts/Stories/All split doesn't add anything useful here (unlike
+  // metric widgets, coverage isn't something that's meaningfully different per scope),
+  // so this page intentionally has no local content-scope toggle.
+  const P = getActivePerformanceView();
   const declared = P.declared||{};
   $("view-perf-quality").innerHTML = `
     <div class="pagehead-row"><div class="pagehead"><h1>Data Quality</h1><p>What was declared, what was detected, and what's incomplete.</p></div>${exportBtnHTML("quality")}</div>
-    ${showScopeToggle?contentScopeToggleHTML("perfQualityContentScope"):""}
     <div class="grid grid-2" style="margin-bottom:16px">
       <div class="card">
         <h3>Declared setup</h3>
@@ -4999,6 +5324,7 @@ function renderPerfQuality(){
           <tr><td>Scope</td><td>${esc(SCOPE_LABELS[declared.scope]||declared.scope||"—")}</td></tr>
           <tr><td>Brand(s)</td><td dir="auto">${(declared.brands||[]).map(esc).join(", ")||"—"}</td></tr>
           <tr><td>Platform(s)</td><td>${(declared.platforms||[]).map(p=>PLATFORM_LABEL(p)).join(", ")||"—"}</td></tr>
+          <tr><td>Account type</td><td dir="auto">${(declared.brands||[]).map(b=>`${esc(b)}: ${((declared.brandAccountType||{})[b]||"owned")==="owned"?"Owned":"Public"}`).join(" · ")||"—"}</td></tr>
         </table>
       </div>
       <div class="card">
@@ -5015,29 +5341,27 @@ function renderPerfQuality(){
         <tr><td>${esc(engagementMetricLabel())}-field coverage</td><td>${fmt(P.engagementCovered)} / ${fmt(P.rows)} (${pct(P.engagementCovered,P.rows)})</td></tr>
       </table>
     </div>`;
-  if(showScopeToggle) bindContentScopeToggles($("view-perf-quality"), renderPerfQuality);
 }
 
 function exportQualitySection(config){
-  const contentScope = STATE.perfQualityContentScope || "all";
-  const P = contentScopeAgg(computeExportP(config), contentScope);
+  const P = computeExportP(config);
   const declared = P.declared||{};
-  const scopeLine = [["Content scope", cap(contentScope)]];
   const sheets = [
     makeSheet("Declared setup", [["Field","Value"],
       ["Scope", SCOPE_LABELS[declared.scope]||declared.scope||"—"],
       ["Brand(s)", (declared.brands||[]).join(", ")||"—"],
-      ["Platform(s)", (declared.platforms||[]).map(p=>PLATFORM_LABEL(p)).join(", ")||"—"]
-    ], config, scopeLine),
+      ["Platform(s)", (declared.platforms||[]).map(p=>PLATFORM_LABEL(p)).join(", ")||"—"],
+      ["Account type", (declared.brands||[]).map(b=>`${b}: ${((declared.brandAccountType||{})[b]||"owned")==="owned"?"Owned":"Public"}`).join(" · ")||"—"]
+    ], config),
     makeSheet("Detected field mapping", [["Canonical field","Detected column"],
       ...Object.entries(P.headerMap||{}).map(([k,v])=>[k, v])
-    ], config, scopeLine),
+    ], config),
     makeSheet("Coverage", [["Metric","Count","Total","Percent"],
       ["Total rows", P.rows, P.rows, "100%"],
       ["Reach-field coverage", P.reachCovered, P.rows, pct(P.reachCovered,P.rows)],
       ["Impressions-field coverage", P.impressionsCovered, P.rows, pct(P.impressionsCovered,P.rows)],
       [`${engagementMetricLabel()}-field coverage`, P.engagementCovered, P.rows, pct(P.engagementCovered,P.rows)]
-    ], config, scopeLine)
+    ], config)
   ];
   exportWorkbook("Data Quality", sheets);
 }
@@ -5081,7 +5405,7 @@ function engagementMetricFilterHTML(){
   const summary = engagementMetricLabel();
   const appliedLine = `<div class="ms-applied-line" dir="auto">Selected: <b>${esc(summary)}</b></div>`;
   return `<div class="perf-filter">
-    <label>Engagement Metrics Use</label>
+    <label>Engagements metric</label>
     <details class="ms-dropdown" data-filter-key="engagement_metric"${isOpen?" open":""}>
       <summary class="ms-summary">${esc(summary)}</summary>
       <div class="ms-panel">
@@ -5523,7 +5847,7 @@ function defaultWizardState(){
     branch: null,
     step: 0,
     listening: { reportType:null, exportParsed:null, dateFrom:null, dateTo:null, clientName:"", guidelinesAccent:null, brief:"", previewDataset:null },
-    perf: { scope:null, brandCount:2, brands:[""], platforms:[], brandAssets:[{palette:[],accent:null,fileName:null}], brandFiles:[null], previewDataset:null },
+    perf: { scope:null, brandCount:2, brands:[""], platforms:[], brandAssets:[{palette:[],accent:null,fileName:null}], brandFiles:[null], brandAccountType:["owned"], previewDataset:null },
     perfExportParsed: null
   };
 }
@@ -5552,7 +5876,10 @@ function showMainPane(which){
 function openWizard(){
   WZ = defaultWizardState();
   if(STATE.listening){ WZ.branch="listening"; WZ.listening.reportType = STATE.listening.meta.report_type||null; WZ.listening.clientName = STATE.client.name!=="Social Listening"?STATE.client.name:""; WZ.listening.brief = STATE.listening.meta.brief||""; }
-  else if(STATE.performance){ WZ.branch="performance"; if(STATE.performance.declared){ WZ.perf.scope=STATE.performance.declared.scope; WZ.perf.brands=STATE.performance.declared.brands.slice(); WZ.perf.brandCount=WZ.perf.brands.length; WZ.perf.platforms=STATE.performance.declared.platforms.slice(); } }
+  else if(STATE.performance){ WZ.branch="performance"; if(STATE.performance.declared){ WZ.perf.scope=STATE.performance.declared.scope; WZ.perf.brands=STATE.performance.declared.brands.slice(); WZ.perf.brandCount=WZ.perf.brands.length; WZ.perf.platforms=STATE.performance.declared.platforms.slice();
+    const savedTypes = STATE.performance.declared.brandAccountType || {};
+    WZ.perf.brandAccountType = WZ.perf.brands.map(b=>savedTypes[b]||"owned");
+  } }
   showMainPane("wizard");
   $("navList").classList.add("locked");
   qsa(".navitem").forEach(b=>b.classList.remove("active"));
@@ -5716,15 +6043,27 @@ function stepHTML_brandAssets(){
   const P = WZ.perf;
   const brands = P.brands.filter(Boolean);
   if(!brands.length) return `<h2>Brand guidelines</h2><p class="wiz-sub">Go back and name your brand(s) first.</p>`;
+  ensureBrandAccountTypeArray();
   return `<h2>Brand logo / guidelines <span class="opt">(optional)</span></h2>
   <p class="wiz-sub">Upload PNG/JPEG/PDF per brand to auto-extract an accent color.</p>
   <div class="brand-asset-grid">
-    ${brands.map((name,i)=>`
+    ${brands.map((name,i)=>{
+      const type = P.brandAccountType[i]||"owned";
+      return `
       <div class="card brand-asset-card">
         <h3 dir="auto">${esc(name)}</h3>
+        <div class="formgroup" style="margin-bottom:12px">
+          <label>Account type</label>
+          <p class="hint" style="margin:2px 0 8px">Whether ${esc(name)}'s accounts are your own (full API access) or a public/competitor profile (Emplifi only sees what's publicly visible) — this changes which Interactions/Engagements numbers are actually available per platform.</p>
+          <div class="pill-toggle brandAccountTypeToggle" data-idx="${i}">
+            <button data-type="owned" class="${type==='owned'?'active':''}">Owned account</button>
+            <button data-type="public" class="${type==='public'?'active':''}">Public account</button>
+          </div>
+        </div>
         <input type="file" class="brandAssetInput" data-idx="${i}" accept="image/*,.pdf">
         <div class="swatchrow" id="brandAssetSwatches_${i}"></div>
-      </div>`).join("")}
+      </div>`;
+    }).join("")}
   </div>`;
 }
 function stepHTML_uploadExportPerformance(){
@@ -5770,6 +6109,24 @@ function ensureBrandFilesArray(){
   while(WZ.perf.brandFiles.length < WZ.perf.brands.length) WZ.perf.brandFiles.push(null);
   WZ.perf.brandFiles.length = WZ.perf.brands.length;
 }
+// Keeps WZ.perf.brandAccountType aligned 1:1 with WZ.perf.brands, defaulting any new
+// slot to "owned" — that matches the dashboard's original single-mode behavior, so an
+// existing dashboard rebuilt without ever touching this new step keeps working exactly
+// as before.
+function ensureBrandAccountTypeArray(){
+  if(!WZ.perf.brandAccountType) WZ.perf.brandAccountType = [];
+  while(WZ.perf.brandAccountType.length < WZ.perf.brands.length) WZ.perf.brandAccountType.push("owned");
+  WZ.perf.brandAccountType.length = WZ.perf.brands.length;
+}
+// Name-keyed {brandName: "owned"|"public"} map built from the wizard's parallel
+// brands/brandAccountType arrays — zips by NAME rather than assuming index alignment
+// survives a .filter(Boolean), since a blank brand slot in the middle of the array
+// would otherwise shift indices.
+function brandAccountTypeMap(P){
+  const m = {};
+  (P.brands||[]).forEach((b,i)=>{ if(b) m[b] = (P.brandAccountType&&P.brandAccountType[i])||"owned"; });
+  return m;
+}
 function ensurePerformancePreview(){
   const P = WZ.perf;
   if(isMultiBrand(P.scope)){
@@ -5782,7 +6139,7 @@ function ensurePerformancePreview(){
       const found = detectedPlatforms.some(dp=>platformMatches(p, dp));
       if(!found) mismatches.push(`Declared platform "${PLATFORM_LABEL(p)}" was not found in any of the uploaded files' Platform column (found: ${detectedPlatforms.join(", ")||"none"}).`);
     });
-    dataset.declared = { scope:P.scope, brands:declaredBrands, platforms:P.platforms, brandAssets:P.brandAssets };
+    dataset.declared = { scope:P.scope, brands:declaredBrands, platforms:P.platforms, brandAssets:P.brandAssets, brandAccountType:brandAccountTypeMap(P) };
     dataset.mismatches = mismatches;
     P.previewDataset = dataset;
     return;
@@ -5824,7 +6181,7 @@ function ensurePerformancePreview(){
     const found = detectedPlatforms.some(dp=>platformMatches(p, dp));
     if(!found) mismatches.push(`Declared platform "${PLATFORM_LABEL(p)}" was not found in the file's Platform column (found: ${detectedPlatforms.join(", ")||"none"}).`);
   });
-  dataset.declared = { scope:P.scope, brands:declaredBrands, platforms:P.platforms, brandAssets:P.brandAssets };
+  dataset.declared = { scope:P.scope, brands:declaredBrands, platforms:P.platforms, brandAssets:P.brandAssets, brandAccountType:brandAccountTypeMap(P) };
   dataset.mismatches = mismatches;
   P.previewDataset = dataset;
 }
@@ -5840,6 +6197,7 @@ function stepHTML_summaryPerformance(){
       <tr><td>Scope</td><td>${esc(SCOPE_LABELS[WZ.perf.scope]||"—")}</td></tr>
       <tr><td>Brand(s)</td><td dir="auto">${WZ.perf.brands.filter(Boolean).map(esc).join(", ")||"—"}</td></tr>
       <tr><td>Platform(s)</td><td>${WZ.perf.platforms.map(p=>PLATFORM_LABEL(p)).join(", ")||"—"}</td></tr>
+      <tr><td>Account type</td><td dir="auto">${WZ.perf.brands.map((b,i)=>b?`${esc(b)}: ${(WZ.perf.brandAccountType[i]||"owned")==="owned"?"Owned":"Public"}`:null).filter(Boolean).join(" · ")||"—"}</td></tr>
     </table>
   </div>
   <div class="card" style="margin-bottom:12px">
@@ -5999,6 +6357,7 @@ function bindWizardStepEvents(stepId){
       WZ.perf.brands = isMultiBrand(WZ.perf.scope) ? Array(WZ.perf.brandCount).fill("") : [""];
       WZ.perf.platforms = [];
       WZ.perf.brandFiles = WZ.perf.brands.map(()=>null);
+      WZ.perf.brandAccountType = WZ.perf.brands.map(()=>"owned");
       WZ.perfExportParsed = null;
       renderWizard();
     }));
@@ -6013,6 +6372,7 @@ function bindWizardStepEvents(stepId){
         const cur = WZ.perf.brands;
         WZ.perf.brands = Array.from({length:n}, (_,i)=>cur[i]||"");
         ensureBrandFilesArray();
+        ensureBrandAccountTypeArray();
         renderWizard();
       });
       qsa(".brandNameInput").forEach(inp=>inp.addEventListener("input", e=>{
@@ -6033,6 +6393,13 @@ function bindWizardStepEvents(stepId){
     }));
   }
   else if(stepId==="brandAssets"){
+    qsa(".brandAccountTypeToggle").forEach(group=>{
+      const idx = +group.dataset.idx;
+      qsa("button", group).forEach(btn=>btn.addEventListener("click", ()=>{
+        WZ.perf.brandAccountType[idx] = btn.dataset.type;
+        renderWizard();
+      }));
+    });
     qsa(".brandAssetInput").forEach(inp=>inp.addEventListener("change", async e=>{
       const idx = +e.target.dataset.idx;
       const file = e.target.files[0]; if(!file) return;
@@ -6111,6 +6478,11 @@ function finalizeListeningBuild(){
 function finalizePerformanceBuild(){
   ensurePerformancePreview();
   STATE.performance = WZ.perf.previewDataset;
+  // Surfaced at the top level (not just nested under .declared) so accountTypeOf(row) can
+  // look it up directly without caring which view-filtered copy of STATE.performance a
+  // given render function is holding — account type is a fixed property of the brand,
+  // not something that changes with filters.
+  STATE.performance.brandAccountType = (STATE.performance.declared && STATE.performance.declared.brandAccountType) || {};
   STATE.perfFilter = {brand:["all"], platform:["all"], content_type:["all"], media_type:["all"]};
   STATE.perfComparisonPlatform = "all";
   STATE.perfFilterOpenKey = null;
@@ -6124,6 +6496,11 @@ function finalizePerformanceBuild(){
   if(brands.length===1){
     STATE.client.name = brands[0];
     if(WZ.perf.brandAssets[0] && WZ.perf.brandAssets[0].accent) STATE.client.accent = WZ.perf.brandAssets[0].accent;
+  } else if(brands.length>1){
+    // Multi-brand builds have no single "client" to label the sidebar with — the default
+    // client.name ("Social Listening", set at STATE init) would otherwise stick around
+    // and mislabel a Performance dashboard. Fall back to a generic, branch-appropriate label.
+    STATE.client.name = "Performance Dashboard";
   }
   saveState();
   applyAccent();
