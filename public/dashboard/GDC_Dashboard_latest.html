@@ -273,26 +273,49 @@ section.view.blurred{filter:blur(5px);opacity:.45;pointer-events:none;user-selec
 .clickable-row{cursor:pointer;transition:background .12s ease;}
 .clickable-row:hover{background:var(--neutral-soft);}
 
-.ask-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
-@media (max-width:900px){.ask-layout{grid-template-columns:1fr;}}
-.ask-qlist{display:flex;flex-direction:column;gap:6px;}
-.ask-qbtn{text-align:left;padding:10px 12px;border-radius:8px;border:1.5px solid var(--card-border);background:var(--card-bg);color:var(--text);font-size:12.5px;cursor:pointer;transition:background .12s ease,border-color .12s ease;}
-[dir="rtl"] .ask-qbtn{text-align:right;}
-.ask-qbtn:hover{background:var(--neutral-soft);}
-.ask-qbtn.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-dark);font-weight:600;}
-.ask-answer-card{background:var(--neutral-soft);border-radius:10px;padding:14px 16px;}
-.ask-answer-label{color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;font-weight:600;}
-.ask-answer-text{font-size:13.5px;line-height:1.5;margin:0 0 12px;}
-.ask-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-.ask-bar-label{font-size:11px;color:var(--text-muted);width:96px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ask-bar-track{flex:1;background:var(--card-border);border-radius:4px;height:8px;overflow:hidden;}
-.ask-bar-fill{height:100%;background:var(--accent);}
-.ask-bar-value{font-size:11px;width:50px;text-align:right;flex-shrink:0;}
-.ask-free-row{display:flex;gap:8px;margin-top:16px;}
-.ask-free-row input{flex:1;height:38px;border-radius:8px;border:1.5px solid var(--card-border);background:var(--bg);color:var(--text);padding:0 12px;font-size:13px;}
-.ask-free-row button{width:38px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-size:15px;cursor:pointer;flex-shrink:0;}
-.ask-free-row button:hover{background:var(--accent-dark);}
-.ask-hint{font-size:11.5px;color:var(--text-muted);margin-top:6px;}
+#sidebar{transition:width .2s ease,min-width .2s ease;}
+#sidebar.ask-expanded{width:calc(var(--sidebar-w) + 230px);min-width:calc(var(--sidebar-w) + 230px);}
+#askMeSection{padding:8px 10px 2px;}
+.ask-me-toggle-btn{
+  width:100%;background:var(--accent);color:#fff;border:none;
+  padding:10px 12px;border-radius:8px;font-size:12.5px;font-weight:700;
+  cursor:pointer;text-align:left;
+}
+[dir="rtl"] .ask-me-toggle-btn{text-align:right;}
+.ask-me-toggle-btn:hover,.ask-me-toggle-btn.active{background:var(--accent-dark);}
+.ask-me-panel{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);}
+.ask-me-sub{font-size:11px;color:var(--sidebar-text-dim);margin:0 0 8px;line-height:1.4;}
+.ask-me-qlist{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
+.ask-me-qbtn{
+  text-align:left;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.04);color:var(--sidebar-text);font-size:11.5px;line-height:1.3;cursor:pointer;
+}
+[dir="rtl"] .ask-me-qbtn{text-align:right;}
+.ask-me-qbtn:hover{background:rgba(255,255,255,0.09);}
+.ask-me-qbtn.active{border-color:var(--accent);background:rgba(7,183,130,0.16);color:#fff;font-weight:600;}
+.ask-me-answer{background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 12px;margin-bottom:10px;}
+.ask-me-answer-label{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--sidebar-text-dim);margin-bottom:6px;font-weight:700;}
+.ask-me-answer-text{font-size:12px;line-height:1.5;color:#fff;margin:0 0 8px;}
+.ask-me-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.ask-me-bar-label{font-size:10px;color:var(--sidebar-text-dim);width:64px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ask-me-bar-track{flex:1;background:rgba(255,255,255,0.12);border-radius:4px;height:6px;overflow:hidden;}
+.ask-me-bar-fill{height:100%;background:var(--accent);}
+.ask-me-bar-value{font-size:10px;width:38px;text-align:right;flex-shrink:0;color:var(--sidebar-text);}
+.ask-me-free-row{display:flex;gap:6px;}
+.ask-me-free-row input{flex:1;height:32px;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:#fff;padding:0 9px;font-size:11.5px;}
+.ask-me-free-row input::placeholder{color:var(--sidebar-text-dim);}
+.ask-me-free-row button{width:32px;height:32px;border-radius:7px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;flex-shrink:0;}
+.ask-me-free-row button:hover{background:var(--accent-dark);}
+.ask-me-nomatch{font-size:10.5px;color:#f0c987;margin-top:6px;line-height:1.4;}
+.ask-me-hint{font-size:10px;color:var(--sidebar-text-dim);margin-top:6px;line-height:1.4;}
+.ask-me-answer-text a{color:var(--accent);font-weight:600;}
+.ask-me-postlist{list-style:decimal;margin:8px 0 0;padding-left:18px;}
+[dir="rtl"] .ask-me-postlist{padding-left:0;padding-right:18px;}
+.ask-me-postlist li{font-size:11px;color:var(--sidebar-text);margin-bottom:6px;line-height:1.5;}
+.ask-me-post-plat{color:#fff;font-weight:600;margin-right:6px;}
+.ask-me-post-date{color:var(--sidebar-text-dim);margin-right:6px;}
+.ask-me-post-eng{color:var(--sidebar-text);margin-right:6px;}
+.ask-me-postlist a{color:var(--accent);font-weight:600;}
 
 @media (prefers-reduced-motion: reduce){
   .card-enter{animation:none;}
@@ -477,6 +500,8 @@ table.datatable th{
 table.datatable td{padding:9px 10px;vertical-align:top;border-top:1.5px solid var(--card-border);border-bottom:1.5px solid var(--card-border);background:var(--card-bg);}
 table.datatable td:first-child{border-left:1.5px solid var(--card-border);border-top-left-radius:8px;border-bottom-left-radius:8px;}
 table.datatable td:last-child{border-right:1.5px solid var(--card-border);border-top-right-radius:8px;border-bottom-right-radius:8px;}
+table.datatable tr.platform-group-spacer td{border:none;background:transparent;padding:0;height:10px;}
+table.datatable .cell-win{color:var(--accent-dark);}
 table.datatable tr:hover td{background:var(--neutral-soft);}
 table.datatable a.mtext{color:var(--text);}
 
@@ -1004,6 +1029,10 @@ table.datatable a.mtext{color:var(--text);}
       <button data-mode="performance">Performance</button>
     </div>
     <nav id="navList"></nav>
+    <div id="askMeSection" style="display:none">
+      <button id="askMeToggleBtn" class="ask-me-toggle-btn" type="button">✨ Ask me</button>
+      <div id="askMePanel" class="ask-me-panel" style="display:none"></div>
+    </div>
     <div id="sidebarFooter">
       <button id="resetFiltersBtn">Reset all filters</button>
       <button id="resetViewBtn" style="margin-top:8px">Reset view</button>
@@ -2585,6 +2614,11 @@ const barValueLabelsPluginLight = {
   id: "barValueLabelsLight",
   afterDatasetsDraw(chart){
     const {ctx, chartArea} = chart;
+    // Color is read from the chart's own options (falling back to white, right for this
+    // plugin's normal home on the dark Data Intelligence panel) rather than hardcoded, so
+    // the PDF export path can temporarily switch it to a dark color before snapshotting the
+    // canvas -- otherwise these labels get baked in white and vanish against the white PDF page.
+    const labelColor = (chart.options.plugins && chart.options.plugins.barValueLabelsLight && chart.options.plugins.barValueLabelsLight.color) || "#fff";
     chart.data.datasets.forEach((dataset, dsIndex)=>{
       const meta = chart.getDatasetMeta(dsIndex);
       if(meta.hidden) return;
@@ -2595,7 +2629,7 @@ const barValueLabelsPluginLight = {
         ctx.save();
         ctx.font = "700 10.5px Inter, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = labelColor;
         const spaceAbove = pos.y - chartArea.top;
         if(spaceAbove < 16){ ctx.textBaseline = "top"; ctx.fillText(fmt(value), pos.x, pos.y+5); }
         else { ctx.textBaseline = "bottom"; ctx.fillText(fmt(value), pos.x, pos.y-5); }
@@ -2604,6 +2638,30 @@ const barValueLabelsPluginLight = {
     });
   }
 };
+const INTEL_CHART_KEYS = ["intelLeaderboard","intelCadence"];
+// The intelligence panel's charts are themed for its own dark background (white value
+// labels, light-blue-gray ticks/legend/gridlines). The PDF export clones the *rendered*
+// canvas via toDataURL -- it's a static image, not the live chart -- so if we snapshot it
+// as-is, that white/light text gets baked into an image that then sits on the PDF's white
+// page and becomes unreadable. Flip to dark-on-light colors, force a synchronous redraw,
+// snapshot, then flip back so the on-screen panel is untouched.
+function setIntelChartTheme(chart, dark){
+  if(!chart) return;
+  const textColor = dark ? "#b8c4dc" : "#333333";
+  const gridColor = dark ? "rgba(255,255,255,.08)" : "#dddddd";
+  const labelColor = dark ? "#fff" : "#111111";
+  const o = chart.options;
+  if(o.plugins && o.plugins.legend && o.plugins.legend.labels) o.plugins.legend.labels.color = textColor;
+  ["x","y","y1"].forEach(axis=>{
+    if(o.scales && o.scales[axis]){
+      if(o.scales[axis].ticks) o.scales[axis].ticks.color = textColor;
+      if(o.scales[axis].grid && o.scales[axis].grid.drawOnChartArea!==false) o.scales[axis].grid.color = gridColor;
+    }
+  });
+  o.plugins = o.plugins || {};
+  o.plugins.barValueLabelsLight = { color: labelColor };
+  chart.update("none");
+}
 
 function hexToRgb(hex){
   hex = String(hex||"").replace("#","").trim();
@@ -2796,11 +2854,75 @@ function storiesVsPostsFor(rows){
   });
   return { stories, posts, storyEng, postEng };
 }
+function linkHTMLFor(permalink){
+  return permalink ? ` <a href="${esc(permalink)}" target="_blank" rel="noopener">Link</a>` : "";
+}
 function bestPostAnswer(P, mentionProfile){
   const top = (P.topPosts||[])[0];
   if(!top) return "No posts with a measurable metric were found in this data.";
   const who = mentionProfile ? `by ${esc(top.profile)} ` : "";
-  return `Your top post ${who}was on ${platDisplay(top.platform)} (${top.date?formatDatePretty(top.date):"date unknown"}), with ${fmt(top.engagement)} ${engagementMetricLabel().toLowerCase()}.`;
+  return `Your top post ${who}was on ${esc(platDisplay(top.platform))} (${top.date?esc(formatDatePretty(top.date)):"date unknown"}), with ${fmt(top.engagement)} ${esc(engagementMetricLabel().toLowerCase())}.${linkHTMLFor(top.permalink)}`;
+}
+function findMentionedProfile(text, profiles){
+  const t = String(text||"").toLowerCase();
+  const words = t.split(/[^a-z0-9؀-ۿ]+/i).filter(w=>w.length>=4);
+  const sorted = [...(profiles||[])].sort((a,b)=>String(b).length-String(a).length);
+  for(const p of sorted){
+    const pl = String(p).toLowerCase();
+    if(!pl) continue;
+    if(t.includes(pl)) return p;
+    if(words.some(w=> pl.includes(w) || w.includes(pl))) return p;
+  }
+  return null;
+}
+function findMentionedPlatform(text, platforms){
+  const t = String(text||"").toLowerCase();
+  // Whole-word matching only -- several platform aliases are 2 letters (tt, ig, fb, li, sc)
+  // and a plain substring check false-positives constantly (e.g. "tt" inside "twitter" or
+  // "attitude"), which would silently mismatch platforms in free text.
+  const words = t.split(/[^a-z0-9]+/i).filter(Boolean);
+  return (platforms||[]).find(p=>{
+    const key = platformKeyOf(p);
+    const aliases = PLATFORM_MATCH_ALIASES[key] || [key];
+    return aliases.some(a=> words.includes(a));
+  }) || null;
+}
+function tryTopPostsQuery(text, P){
+  const t = String(text||"").toLowerCase();
+  const m = t.match(/top\s*(\d{1,2})?\s*posts?/);
+  if(!m) return null;
+  let n = m[1] ? parseInt(m[1],10) : 5;
+  n = Math.max(1, Math.min(n, 10));
+  const profile = findMentionedProfile(t, P.profiles);
+  const platform = findMentionedPlatform(t, P.platforms);
+  let rows = P.rowsData||[];
+  if(profile) rows = rows.filter(r=>(r.profile||"")===profile);
+  if(platform) rows = rows.filter(r=>platformKeyOf(r.platform)===platformKeyOf(platform));
+  const scopeTxt = `${profile?` for ${esc(profile)}`:""}${platform?` on ${esc(platDisplay(platform))}`:""}`;
+  if(!rows.length) return { q: `Top ${n} posts${scopeTxt}`, text: `No posts found${scopeTxt}.`, posts: [] };
+  const ranked = rows.map(r=>({
+    profile:r.profile||"Unknown", platform:r.platform||"Unknown", date:r.date,
+    engagement: engagementValueOf(r), permalink:r.permalink||""
+  })).sort((a,b)=>b.engagement-a.engagement).slice(0,n);
+  return { q: `Top ${n} posts${scopeTxt}`, text: `Top ${n} post${n>1?"s":""}${scopeTxt}, ranked by ${esc(engagementMetricLabel().toLowerCase())}:`, posts: ranked };
+}
+function tryBrandSummaryQuery(text, P){
+  const t = String(text||"").toLowerCase();
+  if(!(t.includes("summary") || t.includes("overview"))) return null;
+  const profile = findMentionedProfile(t, P.profiles);
+  if(!profile) return null;
+  const rows = (P.rowsData||[]).filter(r=>(r.profile||"")===profile);
+  if(!rows.length) return { q: `Performance summary for ${profile}`, text: `No rows found for ${esc(profile)}.` };
+  const agg = aggregatePerformanceRows(rows);
+  const tot = agg.totals;
+  const topPlatform = topEntryBy(agg.byPlatform,"engagement");
+  const top = (agg.topPosts||[])[0];
+  const followersW = computeFollowersWidgets(rows)[0];
+  let followersTxt = "";
+  if(followersW && followersW.mode==="single") followersTxt = ` Current followers: ${fmt(followersW.value)}.`;
+  else if(followersW && followersW.mode==="brand-platforms") followersTxt = ` Current followers across its own platforms: ${fmt(followersW.total)}.`;
+  const bestTxt = top ? `${fmt(top.engagement)} ${esc(engagementMetricLabel().toLowerCase())} on ${esc(platDisplay(top.platform))}${linkHTMLFor(top.permalink)}` : "none found";
+  return { q: `Performance summary for ${profile}`, text: `${esc(profile)} posted ${fmt(tot.posts)} times with ${fmt(tot.engagement)} ${esc(engagementMetricLabel().toLowerCase())}${topPlatform?`, led by ${esc(platDisplay(topPlatform.platform))}`:""}.${followersTxt} Best post: ${bestTxt}.` };
 }
 const ASK_QUESTION_BANK = {
   single_brand_single_platform: [
@@ -2809,7 +2931,7 @@ const ASK_QUESTION_BANK = {
     { id:"content_split", q:()=>"How many posts did we publish, and how does that split by content type?", keywords:["content type","how many posts","split"],
       compute(P){ const t=P.totals; const entries=Object.entries(P.contentType||{}).sort((a,b)=>b[1]-a[1]);
         const bars = entries.map(([k,v])=>({label:cap(k),value:v}));
-        return { text: entries.length ? `${fmt(t.posts)} posts were published, most often ${cap(entries[0][0])} (${fmt(entries[0][1])} of them).` : `${fmt(t.posts)} posts were published.`, bars }; } },
+        return { text: entries.length ? `${fmt(t.posts)} posts were published, most often ${esc(cap(entries[0][0]))} (${fmt(entries[0][1])} of them).` : `${fmt(t.posts)} posts were published.`, bars }; } },
     { id:"engagement_rate", q:()=>"What's our engagement rate, and how has it trended?", keywords:["engagement rate","trend","trending","rate"],
       compute(P){ const t=P.totals; const perPost = t.posts ? t.engagement/t.posts : 0;
         const days = Object.keys(P.dailyInteractionsTotal||{}).sort();
@@ -2904,8 +3026,8 @@ const ASK_QUESTION_BANK = {
       compute(P){ const map=(P.declared&&P.declared.brandAccountType)||{}; const profiles=P.profiles||[];
         const owned = profiles.filter(p=>(map[p]||"owned")==="owned"), pub = profiles.filter(p=>(map[p]||"owned")==="public");
         if(!pub.length) return { text: `All ${profiles.length} brands are set as Owned accounts — comparable on every metric.` };
-        const skewNote = engagementMetricMode()==="engagements" ? ` Since you're viewing Engagements, ${pub.join(", ")} will read 0 there — switch to Total Interactions to compare fairly.` : "";
-        return { text: `${owned.length} of ${profiles.length} brands are Owned; ${pub.join(", ")} ${pub.length>1?"are":"is"} Public.${skewNote}` }; } },
+        const skewNote = engagementMetricMode()==="engagements" ? ` Since you're viewing Engagements, ${esc(pub.join(", "))} will read 0 there — switch to Total Interactions to compare fairly.` : "";
+        return { text: `${owned.length} of ${profiles.length} brands are Owned; ${esc(pub.join(", "))} ${pub.length>1?"are":"is"} Public.${skewNote}` }; } },
     { id:"quality_by_brand", q:()=>"Does data completeness differ by brand?", keywords:["complete","quality","gaps"],
       compute(P){ const byPr = {}; (P.rowsData||[]).forEach(r=>{ const p=r.profile||"Unknown"; byPr[p]=byPr[p]||[]; byPr[p].push(r); });
         const rows = Object.entries(byPr).map(([p,rs])=>Object.assign({profile:p}, coverageFor(rs)));
@@ -2937,17 +3059,17 @@ const ASK_QUESTION_BANK = {
     { id:"content_mix", q:()=>"How does content mix differ across brands and platforms?", keywords:["content type","mix"],
       compute(P){ const entries=Object.entries(P.contentType||{}).sort((a,b)=>b[1]-a[1]);
         const bars = entries.map(([k,v])=>({label:cap(k),value:v}));
-        return { text: entries.length? `Across all brands and platforms, ${cap(entries[0][0])} is the most common content type (${fmt(entries[0][1])} posts).` : "No data.", bars }; } },
+        return { text: entries.length? `Across all brands and platforms, ${esc(cap(entries[0][0]))} is the most common content type (${fmt(entries[0][1])} posts).` : "No data.", bars }; } },
     { id:"account_types_all", q:()=>"Which brands are Owned vs Public, and how does that affect what's comparable?", keywords:["owned","public","account type"],
       compute(P){ const map=(P.declared&&P.declared.brandAccountType)||{}; const profiles=P.profiles||[];
         const owned = profiles.filter(p=>(map[p]||"owned")==="owned"), pub = profiles.filter(p=>(map[p]||"owned")==="public");
         if(!pub.length) return { text: `All ${profiles.length} brands are Owned accounts.` };
-        return { text: `Owned: ${owned.join(", ")||"none"}. Public: ${pub.join(", ")}. Public brands will read 0 for Engagements — use Total Interactions to compare them fairly.` }; } },
+        return { text: `Owned: ${esc(owned.join(", ")||"none")}. Public: ${esc(pub.join(", "))}. Public brands will read 0 for Engagements — use Total Interactions to compare them fairly.` }; } },
     { id:"quality_gaps_all", q:()=>"Where are the biggest data-quality gaps, and for which brand/platform?", keywords:["gaps","quality","complete"],
       compute(P){ const byCombo = {}; (P.rowsData||[]).forEach(r=>{ const k=(r.profile||"Unknown")+" · "+(r.platform||"Unknown"); byCombo[k]=byCombo[k]||[]; byCombo[k].push(r); });
         const rows = Object.entries(byCombo).map(([k,rs])=>Object.assign({combo:k}, coverageFor(rs)));
         const weakest = rows.sort((a,b)=>a.reachPct-b.reachPct)[0];
-        return { text: weakest? `${weakest.combo} has the weakest reach coverage at ${weakest.reachPct}% of its rows.` : "No data." }; } }
+        return { text: weakest? `${esc(weakest.combo)} has the weakest reach coverage at ${weakest.reachPct}% of its rows.` : "No data." }; } }
   ]
 };
 function matchQuestionByText(text, bank){
@@ -2962,52 +3084,66 @@ function matchQuestionByText(text, bank){
   return bestScore>0 ? best : null;
 }
 function renderPerfAsk(){
-  const el = $("view-perf-ask");
+  const el = $("askMePanel");
   if(!el) return;
   const P = getActivePerformanceView();
   if(!P) return;
   const bank = ASK_QUESTION_BANK[P.scope] || ASK_QUESTION_BANK.single_brand_single_platform;
   if(!bank.find(b=>b.id===STATE.perfAskActiveId)) STATE.perfAskActiveId = bank[0].id;
+  const dyn = STATE.perfAskDynamicAnswer;
   const activeItem = bank.find(b=>b.id===STATE.perfAskActiveId);
-  const answer = activeItem.compute(P);
+  const answer = dyn || activeItem.compute(P);
+  const answerLabel = dyn ? esc(dyn.q) : "Answer";
   const maxBar = (answer.bars && answer.bars.length) ? Math.max(...answer.bars.map(b=>b.value),1) : 1;
   const noMatchHTML = STATE.perfAskNoMatch
-    ? `<div class="flagnote">Couldn't match "${esc(STATE.perfAskQueryText||"")}" to a question I know how to answer yet — try one on the left, or rephrase.</div>`
+    ? `<div class="ask-me-nomatch">Couldn't match "${esc(STATE.perfAskQueryText||"")}" to a question I know how to answer yet — try one above, or rephrase.</div>`
     : "";
   el.innerHTML = `
-    <div class="pagehead-row"><div class="pagehead"><h1>Ask me</h1><p>Questions about this ${isMultiBrand(P.scope)?"portfolio's":"account's"} performance, answered from the data you loaded.</p></div></div>
-    <div class="ask-layout">
-      <div class="ask-qlist">
-        ${bank.map(item=>`<button class="ask-qbtn ${item.id===STATE.perfAskActiveId?"active":""}" data-id="${item.id}">${esc(item.q(P))}</button>`).join("")}
-      </div>
-      <div class="ask-answer-card">
-        <div class="ask-answer-label">Answer</div>
-        <p class="ask-answer-text">${esc(answer.text)}</p>
-        ${(answer.bars&&answer.bars.length) ? answer.bars.map(b=>`
-          <div class="ask-bar-row">
-            <span class="ask-bar-label" dir="auto" title="${esc(b.label)}">${esc(b.label)}</span>
-            <div class="ask-bar-track"><div class="ask-bar-fill" style="width:${Math.round(b.value/maxBar*100)}%"></div></div>
-            <span class="ask-bar-value">${fmt(b.value)}</span>
-          </div>`).join("") : ""}
-      </div>
+    <p class="ask-me-sub">Questions about this ${isMultiBrand(P.scope)?"portfolio's":"account's"} performance, answered from the data you loaded.</p>
+    <div class="ask-me-qlist">
+      ${bank.map(item=>`<button class="ask-me-qbtn ${(!dyn&&item.id===STATE.perfAskActiveId)?"active":""}" data-id="${item.id}" dir="auto">${esc(item.q(P))}</button>`).join("")}
     </div>
-    <div class="ask-free-row">
+    <div class="ask-me-answer">
+      <div class="ask-me-answer-label">${answerLabel}</div>
+      <p class="ask-me-answer-text">${answer.text}</p>
+      ${(answer.bars&&answer.bars.length) ? answer.bars.map(b=>`
+        <div class="ask-me-bar-row">
+          <span class="ask-me-bar-label" dir="auto" title="${esc(b.label)}">${esc(b.label)}</span>
+          <div class="ask-me-bar-track"><div class="ask-me-bar-fill" style="width:${Math.round(b.value/maxBar*100)}%"></div></div>
+          <span class="ask-me-bar-value">${fmt(b.value)}</span>
+        </div>`).join("") : ""}
+      ${(answer.posts&&answer.posts.length) ? `<ol class="ask-me-postlist">${answer.posts.map(p=>`
+        <li><span class="ask-me-post-plat">${esc(platDisplay(p.platform))}</span>
+          <span class="ask-me-post-date">${p.date?esc(formatDatePretty(p.date)):"—"}</span>
+          <span class="ask-me-post-eng">${fmt(p.engagement)}</span>
+          ${linkHTMLFor(p.permalink)}</li>`).join("")}</ol>` : ""}
+    </div>
+    <div class="ask-me-free-row">
       <input type="text" id="askFreeInput" placeholder="Ask about your data..." value="${esc(STATE.perfAskQueryText||"")}">
       <button id="askFreeBtn" aria-label="Ask">→</button>
     </div>
     ${noMatchHTML}
-    <p class="ask-hint">Try: "${esc(bank[0].q(P))}"</p>
   `;
-  qsa(".ask-qbtn", el).forEach(btn=>{
+  qsa(".ask-me-qbtn", el).forEach(btn=>{
     btn.addEventListener("click", ()=>{
       STATE.perfAskActiveId = btn.dataset.id;
       STATE.perfAskNoMatch = false;
+      STATE.perfAskDynamicAnswer = null;
       renderPerfAsk();
     });
   });
   const runFreeAsk = ()=>{
     const val = $("askFreeInput").value;
     STATE.perfAskQueryText = val;
+    STATE.perfAskDynamicAnswer = null;
+    const dynTop = tryTopPostsQuery(val, P);
+    const dynSummary = !dynTop ? tryBrandSummaryQuery(val, P) : null;
+    if(dynTop || dynSummary){
+      STATE.perfAskDynamicAnswer = dynTop || dynSummary;
+      STATE.perfAskNoMatch = false;
+      renderPerfAsk();
+      return;
+    }
     const match = matchQuestionByText(val, bank);
     if(match){ STATE.perfAskActiveId = match.id; STATE.perfAskNoMatch = false; }
     else { STATE.perfAskNoMatch = true; }
@@ -3015,6 +3151,23 @@ function renderPerfAsk(){
   };
   $("askFreeBtn").addEventListener("click", runFreeAsk);
   $("askFreeInput").addEventListener("keydown", e=>{ if(e.key==="Enter") runFreeAsk(); });
+}
+function toggleAskMePanel(){
+  const panel = $("askMePanel");
+  const open = panel.style.display==="none";
+  panel.style.display = open ? "" : "none";
+  $("sidebar").classList.toggle("ask-expanded", open);
+  $("askMeToggleBtn").classList.toggle("active", open);
+  if(open) renderPerfAsk();
+}
+function refreshAskMeVisibility(){
+  const show = STATE.mode==="performance" && !isSidebarLocked();
+  $("askMeSection").style.display = show ? "" : "none";
+  if(!show){
+    $("askMePanel").style.display = "none";
+    $("sidebar").classList.remove("ask-expanded");
+    $("askMeToggleBtn").classList.remove("active");
+  }
 }
 
 function renderPerfOverview(){
@@ -3103,20 +3256,23 @@ function renderPerfOverview(){
       const engLabel = engagementMetricLabel();
       const totalPosts = t.posts||1;
       const totalEng = t.engagement||1;
-      const maxPosts = Math.max(1, ...P.byPlatform.map(x=>x.posts));
-      const maxEng = Math.max(1, ...P.byPlatform.map(x=>x.engagement));
       const sorted = [...P.byPlatform].sort((a,b)=>b.posts-a.posts);
       return `<div class="card" style="margin-top:16px"><h3>Platforms breakdown — Posts &amp; ${esc(engLabel)}</h3><div class="barlist">
         ${sorted.map((p,i)=>{
+          // Both bars are scaled against a fixed 0-100% axis (each platform's own share of
+          // the whole), not against whichever platform happens to be biggest -- so a bar's
+          // length is directly readable as "this platform's % of the total", the same number
+          // printed next to it, rather than a relative comparison that shifts every time the
+          // leading platform changes.
           const postsPct = Math.round(p.posts/totalPosts*1000)/10;
           const engPct = Math.round(p.engagement/totalEng*1000)/10;
           const groupStyle = i<sorted.length-1 ? ' style="border-bottom:1px solid var(--card-border);padding-bottom:6px;margin-bottom:6px"' : "";
           return `<div${groupStyle}>
             <div class="row"><div class="lbl" title="${esc(p.platform)}">${platformIconHTML(p.platform)} Posts</div>
-              <div class="track"><div class="fill" style="width:${(p.posts/maxPosts*100)}%"></div></div>
+              <div class="track"><div class="fill" style="width:${postsPct}%"></div></div>
               <div class="num">${fmt(p.posts)} (${postsPct}%)</div></div>
-            <div class="row"><div class="lbl" style="padding-left:22px;color:var(--text-muted);font-size:9.5px;line-height:1.2" title="${esc(engLabel)}">${esc(engLabel)}</div>
-              <div class="track"><div class="fill" style="width:${(p.engagement/maxEng*100)}%;background:#3b82f6"></div></div>
+            <div class="row"><div class="lbl" style="padding-left:22px;color:var(--text-muted);white-space:normal;line-height:1.25" title="${esc(engLabel)}">${esc(engLabel)}</div>
+              <div class="track"><div class="fill" style="width:${engPct}%;background:#3b82f6"></div></div>
               <div class="num">${fmt(p.engagement)} (${engPct}%)</div></div>
           </div>`;
         }).join("")}
@@ -5245,6 +5401,42 @@ function bindBrandIntelMediaBarClicks(){
   });
 }
 
+// Brand x platform breakdown table: grouped by PLATFORM first (not by brand), so every
+// brand active on a given platform sits together — that's the actual comparison a reader
+// wants ("who's winning on Instagram"), rather than brand-then-platform which scatters the
+// same platform's numbers across separate blocks. Brand order is kept the same (P.profiles'
+// order) within every platform group, so it reads consistently top to bottom. Within each
+// platform group, the highest value in each metric column is bolded/accented so the winner
+// per metric is obvious at a glance — only when there's more than one brand on that platform
+// and the value is actually >0 (never highlight a three-way tie at zero as if it meant something).
+// A blank spacer row separates each platform group visually.
+function brandPlatformBreakdownRowsHTML(P, isEng, colCount){
+  const lookup = {};
+  P.byProfilePlatform.forEach(p=>{ lookup[p.platform] = lookup[p.platform]||{}; lookup[p.platform][p.profile] = p; });
+  const metricCols = isEng
+    ? ["posts","likes","comments","shares","saves","post_clicks","engagement","reach"]
+    : ["posts","likes","comments","shares","engagement","reach"];
+  let out = "";
+  let firstGroup = true;
+  P.platforms.forEach(platform=>{
+    const group = P.profiles.map(profile=> lookup[platform] && lookup[platform][profile]).filter(Boolean);
+    if(!group.length) return;
+    if(!firstGroup) out += `<tr class="platform-group-spacer"><td colspan="${colCount}"></td></tr>`;
+    firstGroup = false;
+    const maxByCol = {};
+    metricCols.forEach(col=>{ maxByCol[col] = Math.max(...group.map(g=>g[col]||0)); });
+    const multiInGroup = group.length>1;
+    group.forEach(p=>{
+      const cell = col=>{
+        const val = p[col]||0;
+        const isWin = multiInGroup && val>0 && val===maxByCol[col];
+        return `<td>${isWin?`<b class="cell-win">${fmt(val)}</b>`:fmt(val)}</td>`;
+      };
+      out += `<tr><td dir="auto">${esc(p.profile)}</td><td>${platformIconHTML(p.platform)} ${esc(p.platform)}</td>${cell("posts")}${cell("likes")}${cell("comments")}${cell("shares")}${isEng?cell("saves")+cell("post_clicks"):""}${cell("engagement")}${cell("reach")}</tr>`;
+    });
+  });
+  return out;
+}
 function renderPerfComparison(){
   const base = getActivePerformanceView();
   const showScopeToggle = hasStoriesIn(base.rowsData||[]);
@@ -5275,9 +5467,10 @@ function renderPerfComparison(){
   if(multiBrand && multiPlatform){
     const lookup = {};
     P.byProfilePlatform.forEach(p=>{ lookup[p.profile] = lookup[p.profile]||{}; lookup[p.profile][p.platform] = p; });
+    const colCount = 2 + (isEng ? 8 : 6);
     html += `<div class="card" style="margin-bottom:16px"><h3>Brand × platform breakdown</h3><table class="datatable">
       <thead><tr><th>Brand</th><th>Platform</th><th>Posts</th><th>Likes</th><th>Comments</th><th>Shares</th>${isEng?"<th>Saves</th><th>Post clicks</th>":""}<th>${esc(metricLbl)}</th><th>Reach</th></tr></thead>
-      <tbody>${P.byProfilePlatform.map(p=>`<tr><td dir="auto">${esc(p.profile)}</td><td>${platformIconHTML(p.platform)} ${esc(p.platform)}</td><td>${fmt(p.posts)}</td><td>${fmt(p.likes)}</td><td>${fmt(p.comments)}</td><td>${fmt(p.shares)}</td>${isEng?`<td>${fmt(p.saves)}</td><td>${fmt(p.post_clicks)}</td>`:""}<td><b>${fmt(p.engagement)}</b></td><td>${fmt(p.reach)}</td></tr>`).join("")}</tbody>
+      <tbody>${brandPlatformBreakdownRowsHTML(P, isEng, colCount)}</tbody>
     </table></div>
     <div class="grid grid-2">
       <div class="card"><h3>By brand × platform — posts</h3>${heatmapTableHTML(P.profiles, P.platforms, lookup, "posts", STATE.client.accent)}</div>
@@ -5344,7 +5537,18 @@ function exportComparisonSection(config){
     sheets.push(makeSheet("By platform", [["Platform",...cols], ...rows], config, extraLines));
   }
   if(multiBrand && multiPlatform){
-    const rows = P.byProfilePlatform.map(p=>[p.profile, p.platform, p.posts, p.likes, p.comments, p.shares].concat(isEng?[p.saves||0,p.post_clicks||0]:[]).concat([p.engagement, p.reach]));
+    // Grouped by platform first (matching the on-screen table), so every brand active on a
+    // given platform lands together in the export instead of being scattered brand-by-brand.
+    const lookup = {};
+    P.byProfilePlatform.forEach(p=>{ lookup[p.platform] = lookup[p.platform]||{}; lookup[p.platform][p.profile] = p; });
+    const rows = [];
+    P.platforms.forEach(platform=>{
+      P.profiles.forEach(profile=>{
+        const p = lookup[platform] && lookup[platform][profile];
+        if(!p) return;
+        rows.push([p.profile, p.platform, p.posts, p.likes, p.comments, p.shares].concat(isEng?[p.saves||0,p.post_clicks||0]:[]).concat([p.engagement, p.reach]));
+      });
+    });
     sheets.push(makeSheet("Brand x platform", [["Brand","Platform","Posts","Likes","Comments","Shares"].concat(isEng?["Saves","Post clicks"]:[]).concat([metricLbl,"Reach"]), ...rows], config, extraLines));
   }
   if(!sheets.length) sheets.push(makeSheet("Comparison", [["Note"],["Only one brand and one platform in scope — nothing to compare."]], config, extraLines));
@@ -5904,7 +6108,6 @@ const PERFORMANCE_NAV_BASE = [
   {id:"perf-cadence", label:"Posting Frequency"},
   {id:"perf-comparison", label:"Comparison"},
   {id:"perf-posts", label:"Top Posts"},
-  {id:"perf-ask", label:"Ask me"},
   {id:"perf-quality", label:"Data Quality"}
 ];
 function getPerformanceNav(){
@@ -5957,6 +6160,7 @@ function refreshSidebarLockState(){
     $(id).disabled = locked;
     $(id).classList.toggle("disabled", locked);
   });
+  refreshAskMeVisibility();
 }
 
 /* ============================================================
@@ -6013,6 +6217,7 @@ function applyMode(mode){
   showMainPane(mode);
   buildNav();
   if(mode==="performance") renderPerformanceDashboard();
+  refreshAskMeVisibility();
   saveState();
 }
 function setMode(mode){
@@ -6473,6 +6678,14 @@ function ensurePerformancePreview(){
     } else {
       dataset.profiles = [newName];
     }
+    // dataset.scope above was computed by buildPerformanceDataset() from the RAW,
+    // uncollapsed profile-name strings — which can contain per-platform naming variants
+    // (e.g. "Saudi Arabian GP" vs "Saudi Arabian Grand Prix") that read as multiple
+    // "brands" before the collapse above merges them into the one declared name. Recompute
+    // it now from the actual post-collapse profile count so scope-aware features (Ask me,
+    // the Profile Followers widget, etc.) never see a stale "multi-brand" scope for what the
+    // user explicitly declared — and just confirmed, by collapsing to one name — is one brand.
+    dataset.scope = (dataset.platforms||[]).length>1 ? "single_brand_multi_platform" : "single_brand_single_platform";
   } else {
     declaredBrands.forEach(b=>{
       const found = detectedProfiles.some(d=>profilesLikelySame(d,b));
@@ -6884,6 +7097,7 @@ function bootstrap(){
     const dateStamp = (P && P.date_to ? P.date_to : new Date().toISOString().slice(0,10));
     const title = `Data Intelligence - ${brandsLabel} - ${dateStamp}`.replace(/[\\/:*?"<>|]/g, "-");
 
+    INTEL_CHART_KEYS.forEach(k=> setIntelChartTheme(charts[k], false));
     const temp = document.createElement("div");
     temp.innerHTML = $("intelligenceBody").innerHTML;
     temp.querySelectorAll("canvas").forEach(placeholder=>{
@@ -6896,6 +7110,7 @@ function bootstrap(){
         placeholder.replaceWith(img);
       }
     });
+    INTEL_CHART_KEYS.forEach(k=> setIntelChartTheme(charts[k], true));
     const bodyHTML = temp.innerHTML;
 
     const printCSS = `
@@ -7015,6 +7230,7 @@ function bootstrap(){
     $("main").scrollTo({top:0, behavior:"smooth"});
     toast("View reset.");
   });
+  $("askMeToggleBtn").addEventListener("click", toggleAskMePanel);
 
   if(STATE.listening || STATE.performance){
     applyMode(STATE.mode);
