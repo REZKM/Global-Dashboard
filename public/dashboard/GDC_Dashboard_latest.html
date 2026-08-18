@@ -2729,6 +2729,46 @@ const barValueLabelsPlugin = {
   }
 };
 
+// Chart.js measures its canvas's *current* container width at the exact instant a chart is
+// constructed. If that container hasn't settled into its final size yet at that instant — e.g.
+// right after a CSS width-transition on an ancestor (the sidebar grows/shrinks when the "Ask me"
+// panel opens/closes), or during the very first synchronous render of a freshly-inserted card —
+// the canvas can lock in at a smaller width than the box actually ends up being. Nothing corrects
+// this afterward because the container's own size never changes again, so Chart.js's built-in
+// resize-observer (which only reacts to actual size *changes*) never has anything to react to —
+// the chart just sits undersized inside its own card, real blank space visible on the far side.
+// Fix: force a couple of follow-up resize passes shortly after each chart is built, once layout
+// has genuinely settled, so every chart ends up filling the real, final size of its container.
+// Registered globally (once) so it covers every chart in the dashboard automatically.
+const chartSettleResizePlugin = {
+  id: "chartSettleResize",
+  afterInit(chart){
+    const doResize = ()=>{
+      try{ if(chart && chart.canvas && chart.ctx) chart.resize(); }catch(e){ /* chart may have been destroyed already; ignore */ }
+    };
+    if(typeof requestAnimationFrame === "function"){
+      requestAnimationFrame(()=> requestAnimationFrame(doResize));
+    }
+    // Staggered retries: cheap (a no-op re-measure when size hasn't actually changed) and cover
+    // a wide range of "container settles late" timings — grid layout, font/image load reflow,
+    // multiple charts being built back-to-back on the same page, etc. — without needing to know
+    // the exact culprit.
+    [0,120,300,600,1200].forEach(ms=> setTimeout(doResize, ms));
+    // Belt-and-braces: keep watching the chart's own wrapper for the rest of its life, so any
+    // later real size change (e.g. the sidebar growing/shrinking when "Ask me" opens/closes)
+    // also gets picked up, not just the initial settle.
+    if(typeof ResizeObserver === "function" && chart.canvas && chart.canvas.parentNode){
+      const ro = new ResizeObserver(()=> doResize());
+      ro.observe(chart.canvas.parentNode);
+      chart.__settleResizeObserver = ro;
+    }
+  },
+  destroy(chart){
+    if(chart.__settleResizeObserver){ try{ chart.__settleResizeObserver.disconnect(); }catch(e){ /* ignore */ } }
+  }
+};
+if(typeof Chart !== "undefined" && Chart.register) Chart.register(chartSettleResizePlugin);
+
 const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function formatDatePretty(dateVal){
   if(!dateVal) return "—";
