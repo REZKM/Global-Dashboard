@@ -12145,13 +12145,33 @@ function clearWizardDraft(){
 // two call sites (the gear icon's "Leave" confirmation, and the placeholder screen's own
 // "Open setup wizard" button) both legitimately want to START FRESH, not resume a stale draft.
 function resumeWizard(draft){
-  WZ = draft;
-  showMainPane("wizard");
-  $("navList").classList.add("locked");
-  qsa(".navitem").forEach(b=>b.classList.remove("active"));
-  ["resetFiltersBtn","downloadBtn"].forEach(id=>{ $(id).disabled = true; $(id).classList.add("disabled"); });
-  WZ_LAST_URL_KEY = null; // first render after resume should sync (not push a duplicate) the URL
-  renderWizard();
+  try{
+    WZ = draft;
+    // Round 90: a draft captured mid-transition (or otherwise stale) can carry a WZ.step
+    // that no longer resolves to a real step for its branch/perfMode -- renderWizardStepHTML()'s
+    // switch silently returns "" for any unrecognized step, with no exception thrown, which is
+    // exactly what produced the reported "wizard chrome visible, step body permanently blank"
+    // bug after real cross-site back-navigation. Validate and reset to a safe step BEFORE the
+    // first render rather than let that gap render an empty box.
+    const steps = getStepList();
+    if(!Number.isInteger(WZ.step) || WZ.step < 0 || WZ.step >= steps.length || !steps[WZ.step]){
+      WZ.step = 0;
+    }
+    showMainPane("wizard");
+    $("navList").classList.add("locked");
+    qsa(".navitem").forEach(b=>b.classList.remove("active"));
+    ["resetFiltersBtn","downloadBtn"].forEach(id=>{ $(id).disabled = true; $(id).classList.add("disabled"); });
+    WZ_LAST_URL_KEY = null; // first render after resume should sync (not push a duplicate) the URL
+    renderWizard();
+  }catch(e){
+    // Belt-and-suspenders: whatever else could go wrong restoring an arbitrary persisted
+    // draft, never leave the user stuck on a permanently blank wizard box -- drop the
+    // untrustworthy draft and fall back to a genuinely fresh wizard instead. Logged (not
+    // surfaced to the user) so a real failure can still be diagnosed from a live console.
+    if(typeof console!=="undefined" && console.error) console.error("Wizard resume failed, starting fresh:", e);
+    clearWizardDraft();
+    openWizard();
+  }
 }
 
 function isMultiBrand(scope){ return scope==="multi_brand_single_platform" || scope==="multi_brand_multi_platform"; }
