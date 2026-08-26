@@ -1396,6 +1396,33 @@ table.datatable a.mtext{color:var(--text);}
   flex-shrink:0;min-width:96px;margin-top:0;margin-bottom:0;
   color:var(--filter-bar-text-muted);line-height:32px;
 }
+/* Round 84 bugfix: Performance Over Time's single-brand case (renderTimeBenchSetup(), Brand
+   row) renders the brand name as a plain .time-bench-single-value div with no background of
+   its own -- it sits directly on the filter bar's own dark navy gradient. That div's base
+   rule (line ~1097) uses color:var(--text), which is correct for the normal white/light card
+   background it's used against everywhere else, but in Light Theme --text is near-black
+   (#15171a), so on this dark bar it was rendering essentially invisible -- reported as "the
+   Brand filter doesn't show" for the one-brand/multi-platform scope. The >1-brand case (the
+   <select> in .benchmark-pill-select-wrap right above) never had this bug: that wrap paints
+   its own opaque var(--card-bg) pill background first, so var(--text) inside it always has
+   the light card context it expects. This scoped override gives the single-value case the
+   same light, always-readable color already used for every other piece of text that sits
+   directly on this bar (the label just above, Apply-row labels, etc.) instead of a background
+   fix, since a lone value has no pill treatment anywhere else in this filter bar to match. */
+.benchmark-filter-bar .time-bench-single-value{color:var(--filter-bar-text);}
+/* Round 85 bugfix: the value's base rule (line ~1097) is height:36px + margin-top:8px --
+   right for wherever that rule was originally aimed at, but every OTHER control that shares
+   this bar's row-per-group layout was already scoped down to match the "Brand" label's own
+   32px line-height with NO extra top margin, so it reads as truly beside the label, not just
+   technically-the-same-flex-line-but-visibly-lower: .benchmark-pill-select-wrap (the >1-brand
+   dropdown right above this) is a flat height:32px with no margin-top of its own, and
+   .benchmark-brand-pills gets an explicit margin-top:0 override two rules above specifically
+   for this bar (its own un-scoped base rule is margin-top:8px, meant for a stacked
+   label-above-pills layout used elsewhere). .time-bench-single-value never got the same
+   treatment, so the single-brand case alone sat 8-12px lower than its own label -- reading as
+   "the brand name is on the next line" even though it never actually wrapped. This brings it
+   in line with its two siblings' shared 32px/no-margin recipe. */
+.benchmark-filter-bar .time-bench-single-value{height:32px;margin-top:0;}
 .benchmark-brand-pills{margin-top:0;}
 .benchmark-filter-divider{height:1px;background:var(--filter-bar-border);}
 /* Fix Date Range / Show % of change: a plain list row instead of a boxed section.
@@ -1596,6 +1623,32 @@ body.mode-performance #performanceRoot .grid-kpi .card.kpi .widget-head-row .lab
 .widget-remove-confirm-cancel:hover{background:var(--card-border);}
 .widget-remove-confirm-remove{background:#ef4444;color:#fff;}
 .widget-remove-confirm-remove:hover{background:#dc2626;}
+
+/* Round 87: Setup Wizard gear icon's own confirmation -- reuses .widget-remove-confirm-
+   overlay/-backdrop/-panel/-actions/-cancel as-is (same shell, same Cancel button) and
+   .widget-remove-confirm-remove as-is for Leave (the one genuinely destructive/irreversible-
+   in-this-tab choice, matching the explicit "styled as a red/destructive button" spec). Only
+   the two message lines and the new middle "Open in New Tab" option need their own rules --
+   scoped under .widget-remove-confirm-panel so they win over that class's own generic
+   `p{margin:0 0 18px;...}` rule instead of colliding with it. */
+.widget-remove-confirm-panel .wizard-nav-confirm-title{margin:0 0 6px;font-size:14px;font-weight:700;line-height:1.4;color:var(--text);}
+.widget-remove-confirm-panel .wizard-nav-confirm-sub{margin:0 0 18px;font-size:12.5px;font-weight:500;line-height:1.4;color:var(--text-muted);}
+.wizard-nav-confirm-newtab{
+  border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;
+  background:var(--accent);color:#fff;
+}
+.wizard-nav-confirm-newtab:hover{background:var(--accent-dark);}
+/* Round 88: at the shared .widget-remove-confirm-panel's own 340px width, "Open in New Tab"
+   (the longest of the 3 button labels here, unlike the 2-button KPI-remove modal's short
+   Cancel/Remove) wrapped onto two lines. Widened just THIS panel via its id (id beats the
+   shared class's own width:340px, no need to touch that class or the KPI-remove modal that
+   still uses it) and forced the action row + every button label to nowrap so all three
+   buttons stay single-line at any theme/zoom. */
+#wizardNavConfirmPanel{width:460px;}
+#wizardNavConfirmPanel .widget-remove-confirm-actions{flex-wrap:nowrap;}
+#wizardNavConfirmPanel .widget-remove-confirm-cancel,
+#wizardNavConfirmPanel .wizard-nav-confirm-newtab,
+#wizardNavConfirmPanel .widget-remove-confirm-remove{white-space:nowrap;}
 
 /* Flag/Heads-up notice boxes get the same removable treatment. */
 .flagnote{position:relative;padding-right:34px;}
@@ -2602,6 +2655,23 @@ body.mode-performance #performanceRoot > .view{ grid-column:span 12; min-width:0
     <div class="widget-remove-confirm-actions">
       <button type="button" id="widgetRemoveConfirmCancel" class="widget-remove-confirm-cancel">Cancel</button>
       <button type="button" id="widgetRemoveConfirmOk" class="widget-remove-confirm-remove">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- Round 87: same overlay/backdrop/panel shell as the KPI-card remove confirmation just
+     above (same CSS classes reused as-is for visual consistency), but its own sibling
+     overlay/JS rather than repurposing that one's hardcoded remove-only logic, since this
+     needs a 3-way choice (Cancel / Open in New Tab / Leave) instead of a 2-way one. -->
+<div id="wizardNavConfirmOverlay" class="widget-remove-confirm-overlay">
+  <div class="widget-remove-confirm-backdrop" id="wizardNavConfirmBackdrop"></div>
+  <div class="widget-remove-confirm-panel" id="wizardNavConfirmPanel">
+    <p class="wizard-nav-confirm-title">Are you sure you want to go back to the Setup Wizard?</p>
+    <p class="wizard-nav-confirm-sub">You will lose your current progress in this dashboard.</p>
+    <div class="widget-remove-confirm-actions">
+      <button type="button" id="wizardNavConfirmCancel" class="widget-remove-confirm-cancel">Cancel</button>
+      <button type="button" id="wizardNavConfirmNewTab" class="wizard-nav-confirm-newtab">Open in New Tab</button>
+      <button type="button" id="wizardNavConfirmLeave" class="widget-remove-confirm-remove">Leave</button>
     </div>
   </div>
 </div>
@@ -5722,6 +5792,25 @@ function enumerateBucketKeys(dateFrom, dateTo, granularity){
   });
   return out;
 }
+// Round 86: shared by both Benchmarking View branches' own "Posting timeline" chart
+// (renderBenchmarkHalfCharts for Brand & Platform Comparison, renderTimeBenchHalfCharts for
+// Performance Over Time). Both used to build their bucket list as
+// Array.from(new Set([...Object.keys(posts), ...Object.keys(interactions)])).sort() -- which
+// only ever produces buckets that actually have at least one row, so the X-axis silently
+// started/ended on the first/last day WITH data instead of the user's selected date range,
+// and any empty day in between just vanished instead of showing as 0. This wraps
+// enumerateBucketKeys() (the exact same zero-padding fix already used by the main dashboard's
+// own Posting Timeline widget, renderPerfFrequency) with the SELECTED range -- not P.date_from/
+// date_to, which on both branches' own *Aggregis are the FILTERED ROWS' own actual min/max,
+// not the selection itself (see benchmarkAggFor()/timeBenchAggFor()'s own comments) -- so the
+// chart always spans exactly the selected From/To, inclusive, with missing days at 0. Falls
+// back to the old data-derived union only when the caller has no resolvable range at all (e.g.
+// a brand with zero rows and thus no derivable default), so the chart still renders something
+// instead of going blank.
+function benchmarkTimelineBuckets(range, granularity, posts, interactions){
+  if(range && range.from && range.to) return enumerateBucketKeys(range.from, range.to, granularity);
+  return Array.from(new Set([...Object.keys(posts||{}), ...Object.keys(interactions||{})])).sort();
+}
 
 function renderPerfFrequency(){
   if(!$("view-perf-reach")) return;
@@ -8150,7 +8239,13 @@ function renderBenchmarkHalfCharts(brand){
   const granularity = STATE.benchmarkGranularity || "daily";
   const posts = bucketDailyMap(P.dailyPostsTotal, granularity);
   const interactions = bucketDailyMap(P.dailyInteractionsTotal, granularity);
-  const buckets = Array.from(new Set([...Object.keys(posts), ...Object.keys(interactions)])).sort();
+  // Round 86: buckets now span this brand's own SELECTED date range end-to-end (see
+  // benchmarkTimelineBuckets()'s own comment) instead of only the days that happen to have a
+  // matching row -- benchmarkEffectiveRange() is the exact same range benchmarkAggFor() itself
+  // just filtered rows by, so the chart's X-axis and the KPI totals above it always agree on
+  // what "the selected range" means.
+  const range = benchmarkEffectiveRange(brand);
+  const buckets = benchmarkTimelineBuckets(range, granularity, posts, interactions);
 
   destroyChart("bmTimeline_"+slug);
   const timelineEl = $("bmTimeline_"+slug);
@@ -9445,7 +9540,12 @@ function renderTimeBenchHalfCharts(rangeIdx){
   const granularity = STATE.benchmarkGranularity || "daily";
   const posts = bucketDailyMap(P.dailyPostsTotal, granularity);
   const interactions = bucketDailyMap(P.dailyInteractionsTotal, granularity);
-  const buckets = Array.from(new Set([...Object.keys(posts), ...Object.keys(interactions)])).sort();
+  // Round 86: same fix as renderBenchmarkHalfCharts() -- buckets now span this range's own
+  // SELECTED from/to end-to-end (see benchmarkTimelineBuckets()'s own comment), the exact same
+  // {from,to} timeBenchAggFor() itself just filtered rows by, instead of only the days that
+  // happen to have a matching row.
+  const range = (STATE.timeBenchRanges||[])[rangeIdx];
+  const buckets = benchmarkTimelineBuckets(range, granularity, posts, interactions);
 
   destroyChart("tbTimeline_"+slug);
   const timelineEl = $("tbTimeline_"+slug);
@@ -12035,6 +12135,24 @@ function closeWizard(){
   }
   refreshSidebarLockState();
 }
+// Round 87: the ⚙ Setup Wizard gear icon used to call openWizard() directly, with no
+// confirmation at all -- openWizard() resets WZ (the wizard's own draft state) and re-seeds
+// it only from STATE.listening/STATE.performance's DECLARED config, not from any of the
+// live dashboard's current filters/benchmark selections/scroll position/open panels, so a
+// stray gear-icon click silently knocked the user out of whatever they were doing. This gate
+// (same overlay/backdrop/panel shell as the KPI-card remove confirmation, see that CSS
+// comment) now sits in front of every call site that should ask first. Only the gear icon is
+// wired to it in this round -- openWizardBtn (the placeholder screen's own "Open setup
+// wizard" button) is left calling openWizard() directly, since there's no dashboard progress
+// to lose from an empty placeholder screen.
+function openWizardNavConfirm(){
+  $("wizardNavConfirmOverlay").classList.add("show");
+  $("main").classList.add("blurred-behind");
+}
+function closeWizardNavConfirm(){
+  $("wizardNavConfirmOverlay").classList.remove("show");
+  $("main").classList.remove("blurred-behind");
+}
 
 function renderSwatchPicker(container, swatches, current, onPick){
   if(!swatches.length){ container.innerHTML = '<p class="hint">No dominant colors extracted — try a PNG/JPEG with clear brand colors, or pick manually below.</p>'; return; }
@@ -13434,7 +13552,11 @@ function bootstrap(){
     setMode(btn.dataset.mode);
   });
   $("bigdHamburger").addEventListener("click", ()=> $("app").classList.toggle("sidebar-collapsed"));
-  $("adminFab").addEventListener("click", openWizard);
+  // Round 87: the gear icon no longer calls openWizard() directly -- it opens the
+  // confirmation modal first (see openWizardNavConfirm()'s own comment). openWizardBtn just
+  // below is intentionally left calling openWizard() directly -- it only ever appears on the
+  // empty placeholder screen, where there's no dashboard progress to lose.
+  $("adminFab").addEventListener("click", openWizardNavConfirm);
   $("wizardCloseX").addEventListener("click", closeWizard);
   $("wizNext").addEventListener("click", wizardNext);
   $("wizBack").addEventListener("click", wizardBack);
@@ -13667,6 +13789,28 @@ function bootstrap(){
       $("main").classList.remove("blurred-behind");
       const benchmarkOverlay = $("benchmarkViewOverlay");
       if(benchmarkOverlay && benchmarkOverlay.classList.contains("show")) renderBenchmarkOverlayRoot();
+    }
+  });
+  // Round 87: the gear icon's own 3-way confirmation. Cancel/backdrop just closes (identical
+  // no-op behavior to the widget-remove modal's own Cancel/backdrop). Open in New Tab opens a
+  // second instance of this SAME document -- since saveState()/loadState() are intentionally
+  // stubbed out (see their own comments), a fresh instance always boots straight into the
+  // Setup Wizard on its own, so no extra routing/query-param plumbing is needed -- and leaves
+  // the CURRENT tab's dashboard progress completely untouched. Only Leave actually calls
+  // openWizard() in the current tab, which is the one choice that can lose progress here.
+  document.addEventListener("click", (e)=>{
+    if(e.target.closest("#wizardNavConfirmCancel") || e.target.closest("#wizardNavConfirmBackdrop")){
+      closeWizardNavConfirm();
+      return;
+    }
+    if(e.target.closest("#wizardNavConfirmNewTab")){
+      window.open(window.location.href, "_blank", "noopener");
+      closeWizardNavConfirm();
+      return;
+    }
+    if(e.target.closest("#wizardNavConfirmLeave")){
+      closeWizardNavConfirm();
+      openWizard();
     }
   });
   document.addEventListener("click", (e)=>{
