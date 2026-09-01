@@ -295,6 +295,16 @@ section.view.blurred{filter:blur(5px);opacity:.45;pointer-events:none;user-selec
 .card h3{margin:0 0 12px;font-size:13.5px;font-weight:700;}
 .card h3 .sub{font-weight:500;color:var(--text-muted);font-size:11.5px;}
 
+/* Round 99: a second, duplicate horizontal scrollbar mirrored at the TOP of a wide table
+   (currently only Post Performance) -- the table's own .card{overflow-x:auto} already gives
+   it a scrollbar at the bottom, but on a long table a user has to scroll all the way down
+   just to find it. This is a thin sibling strip synced 1:1 with the real .card's scrollLeft
+   via JS (see syncPerfPostsTopScroll()); its inner div's width is set in JS to match the
+   same scroll range so the two scrollbars always move together. Hidden by JS when the table
+   isn't wide enough to need scrolling in the first place. */
+.table-scroll-top{overflow-x:auto;overflow-y:hidden;height:14px;margin-bottom:6px;}
+.table-scroll-top-inner{height:1px;}
+
 /* ============================================================
    LIVE FEEL: card entrance, count-up numbers, live-pulse dot
    ============================================================ */
@@ -607,6 +617,45 @@ table.datatable a.mtext{color:var(--text);}
 }
 [dir="rtl"] #adminFab{right:auto;left:22px;}
 #adminFab:hover{background:var(--accent);}
+
+/* Round 98: Vertical Dot Navigation -- fixed, right-edge, vertically-centered scrollspy dots
+   mirroring the sidebar's own section list. Sits above #adminFab (z-index 500) but well below
+   every modal/overlay (which all use z-index >=1850), so an opened overlay always covers it as
+   expected. Deliberately small (22px dots, 10px gaps) so it never competes visually with the
+   dashboard content it sits beside -- kept off narrow/mobile viewports entirely since there's no
+   room for a floating rail without overlapping real content there. */
+.bigd-dotnav{
+  /* #main's own right padding (34px, see its own rule) is the gutter between a card's right
+     edge and the actual viewport edge -- (34 - 20px dot width) / 2 = 7px centers the dot rail
+     in that gutter with equal clearance on both sides, same convention already used for
+     #app.sidebar-collapsed's hamburger button. */
+  position:fixed;top:50%;right:7px;transform:translateY(-50%);z-index:800;
+  display:none;flex-direction:column;align-items:center;gap:10px;
+}
+.bigd-dotnav.show{display:flex;}
+[dir="rtl"] .bigd-dotnav{right:auto;left:7px;}
+.bigd-dotnav-dot{
+  position:relative;width:20px;height:20px;padding:0;border-radius:50%;
+  background:var(--card-bg,#fff);border:2px solid var(--card-border,#dde3ea);color:var(--text-muted);
+  font-size:10px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.12);
+  transition:transform .16s ease,background .16s ease,color .16s ease,border-color .16s ease,opacity .16s ease;
+}
+.bigd-dotnav-num{pointer-events:none;}
+.bigd-dotnav-dot.active{background:var(--accent);border-color:var(--accent);color:#fff;transform:scale(1.25);}
+/* Hovering anywhere in the rail shrinks/dims every dot except the one actually under the
+   cursor, which grows -- pure CSS, no JS needed for the "others smallen accordingly" behavior. */
+.bigd-dotnav:hover .bigd-dotnav-dot{transform:scale(.72);opacity:.55;}
+.bigd-dotnav:hover .bigd-dotnav-dot:hover{transform:scale(1.4);opacity:1;}
+.bigd-dotnav-tooltip{
+  position:absolute;top:50%;right:calc(100% + 10px);transform:translateY(-50%);
+  background:var(--ink,#1a2130);color:#fff;font-size:11.5px;font-weight:600;
+  padding:5px 10px;border-radius:6px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .14s ease;box-shadow:0 3px 10px rgba(0,0,0,.18);
+}
+[dir="rtl"] .bigd-dotnav-tooltip{right:auto;left:calc(100% + 10px);}
+.bigd-dotnav-dot:hover .bigd-dotnav-tooltip{opacity:1;}
+@media(max-width:900px){.bigd-dotnav{display:none !important;}}
 
 #adminOverlay{
   position:fixed;inset:0;background:rgba(10,10,12,0.55);display:none;
@@ -1472,6 +1521,32 @@ table.datatable a.mtext{color:var(--text);}
 .benchmark-section-title-stack{min-width:0;}
 .benchmark-section-subtitle{margin:3px 0 0;font-size:11px;color:var(--text-muted);font-weight:600;}
 .benchmark-section-row{display:grid;gap:20px;margin-bottom:8px;align-items:stretch;}
+/* Round 100: once more than 5 columns are being compared at once, benchmarkSectionRowHTML()
+   switches this same row to a fixed 5-columns-visible track size (grid-auto-columns instead
+   of repeat(N,1fr)) and adds this class so the row scrolls horizontally on its own rather
+   than squeezing every column down to an unreadable width. The native scrollbar itself is
+   hidden here -- syncBenchmarkColScroll() drives every row (and the one fixed strip below)
+   in lockstep, so showing 6 separate native scrollbars stacked down the modal would just be
+   visual noise on top of that one shared control. */
+.benchmark-section-row-scrollable{overflow-x:auto;scrollbar-width:none;}
+.benchmark-section-row-scrollable::-webkit-scrollbar{display:none;}
+/* Round 100: at 6+ columns, the per-column From/To date pickers' calendar icon is dropped
+   (the boxes are already narrow at 5-visible width, and with a scrollable row the icon reads
+   as clutter next to the dd/mm/yyyy text) -- scoped to the benchmark view's own per-column
+   header boxes only, never the icon anywhere else in the app. */
+.benchmark-scroll-mode .benchmark-half-col .bigd-date-display-icon{display:none;}
+/* Round 100: one scrollbar strip, fixed to the viewport so it tracks the benchmark panel
+   regardless of how far .benchmark-view-main has been scrolled vertically -- positioned to
+   align with the panel's own edges (5vh/5vw margin, same as .benchmark-view-panel) and the
+   content's own 28px side padding (.benchmark-view-main), so it reads as sitting directly
+   under the columns above it rather than floating independently. Built/shown only when at
+   least one row is actually in scroll mode -- see syncBenchmarkColScroll(). */
+.benchmark-col-scrollbar{
+  position:fixed;left:calc(5vw + 28px);right:calc(5vw + 28px);bottom:calc(5vh + 14px);
+  height:14px;z-index:1902;overflow-x:auto;overflow-y:hidden;display:none;
+}
+.benchmark-col-scrollbar.show{display:block;}
+.benchmark-col-scrollbar-inner{height:1px;}
 @media(max-width:1000px){
   .benchmark-view-panel{width:96vw;left:2vw;height:94vh;top:3vh;}
   .benchmark-section-row{grid-template-columns:1fr !important;}
@@ -1480,6 +1555,10 @@ table.datatable a.mtext{color:var(--text);}
      the full workspace width instead (still just an overlay on top, never resizing
      .benchmark-view-main underneath). */
   .benchmark-post-detail-sidebar{width:100%;min-width:0;}
+  /* Round 100: the !important stacking rule just above already forces every section row back
+     to a single full-width column below this breakpoint, so there's nothing left to scroll
+     horizontally through -- the shared strip would just be a stray, purposeless control. */
+  .benchmark-col-scrollbar{display:none !important;}
 }
 .benchmark-box{border:1px solid var(--card-border);border-radius:14px;padding:16px;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
 /* The media-type table's columns used to size themselves off their own content
@@ -1793,10 +1872,10 @@ body.mode-performance #performanceRoot .grid-kpi .card.kpi .widget-head-row .lab
 .brand-intel-grid canvas{max-width:100%;}
 .brand-intel-chart-card{overflow-x:hidden;}
 @media(max-width:900px){.brand-intel-grid{grid-template-columns:1fr;}}
-.brand-intel-obs-label{font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text);margin-bottom:8px;}
-.brand-intel-insights ul{margin:0;padding-left:18px;}
-.brand-intel-insights li{margin:0 0 10px;font-size:13px;line-height:1.6;color:var(--accent-dark,var(--accent));}
-.brand-intel-insights li:last-child{margin-bottom:0;}
+/* Round 97: .brand-intel-obs-label and the old .brand-intel-insights ul/li list styling are
+   retired now that brandIntelInsightsWrapHTML() renders .bigd-radar-insights-list boxes instead
+   (see that rule's definition) -- .brand-intel-insights b{} stays since bold spans inside those
+   boxes are still used. */
 .brand-intel-insights b{font-weight:700;}
 .brand-media-row{margin-bottom:14px;}
 .brand-media-row .name{font-size:12.5px;font-weight:700;margin-bottom:6px;}
@@ -2915,6 +2994,12 @@ const PERFORMANCE_ALIASES = {
   content_type:["Content type","Post Type"],
   media_type:  ["Media type","Media Type"],
   caption:     ["Content","Description","Title","Message"],
+  // Round 98: YouTube exports carry the video's actual text in "Title", not "Content" (which is
+  // typically blank/irrelevant for YouTube rows) -- resolved as its own canonical field here
+  // (independent of whatever "caption" landed on) so canonicalizeRawRows() can override caption
+  // with it specifically for YouTube rows, without disturbing every other platform's normal
+  // Content-column caption.
+  title:       ["Title"],
   permalink:   ["View on platform","Post detail URL","Link URL","Post Link","Permalink"],
   likes:       ["Total likes","Likes","Reactions"],
   comments:    ["Total comments","Comments"],
@@ -3181,6 +3266,19 @@ function engagementMetricMode(){ return STATE.perfEngagementMetric || "interacti
 function accountTypeOf(row){
   const m = (STATE.performance && STATE.performance.brandAccountType) || {};
   return m[row.profile] || "owned";
+}
+// Round 99: true when the whole Performance dashboard was built for exactly one brand -- any
+// number of platforms -- AND that brand is declared "owned" (not "public"). This is the scope
+// where every reported number, including a genuine 0, is real information about the client's
+// own account rather than a comparison artifact against other brands/competitors, so:
+//  (a) the global engagement-metric filter defaults to "Engagements" instead of "Total
+//      Interactions" (see finalizePerformanceBuild()), and
+//  (b) zero-value KPI cards never offer the removable "x", anywhere -- Overview, Benchmarking
+//      (brand/platform), and Time-Based Benchmarking all check this before deciding isZero.
+function isSingleOwnedBrandScope(){
+  const P = STATE.performance;
+  if(!P || (P.profiles||[]).length!==1) return false;
+  return accountTypeOf({profile: P.profiles[0]}) === "owned";
 }
 function engagementValueOf(r){
   return engagementMetricMode()==="engagements" ? engagementsValueOf(r) : interactionsValueOf(r);
@@ -3690,6 +3788,18 @@ function canonicalizeRawRows(rawRows, headerMap){
   });
   // Preserve the literal Profile-name-column value forever, before any merging/relabeling touches .profile
   canon.forEach(r=>{ r.author = r.profile; });
+  // Round 98: for YouTube rows specifically, the post's actual text lives in the "Title" column,
+  // not "Content" -- override caption with it here (once, at canonicalization time) so every
+  // caption-consuming widget downstream (Top Engaged Posts, Post Performance, Benchmarking,
+  // etc.) picks it up automatically without each of them needing platform-specific logic. Falls
+  // back to whatever caption already resolved to when a row has no title text (or the file has
+  // no distinct Title column at all -- e.g. caption itself already resolved to Title).
+  canon.forEach(r=>{
+    if(platformMatches("youtube", r.platform)){
+      const title = String(r.title==null?"":r.title).trim();
+      if(title) r.caption = title;
+    }
+  });
   return canon;
 }
 
@@ -3859,6 +3969,7 @@ function renderAll(){
   renderContext();
   animateCardsIn($("listeningRoot"));
   animateCounters($("listeningRoot"));
+  buildDotNav();
 }
 
 const REPORT_TYPE_LABELS = {
@@ -5681,7 +5792,9 @@ function renderPerfOverview(){
   // dismissed this way, only an empty/not-applicable one.
   function kpiTile(key, iconKey, compareTitle, label, rawValue, sparkId, footHtml, extraFootHtml){
     if(removedKpis.includes(key)) return "";
-    const isZero = !rawValue;
+    // Round 99: a single owned brand's zero values are real findings, not comparison
+    // clutter -- never offer to remove them.
+    const isZero = !rawValue && !isSingleOwnedBrandScope();
     return renderStandardWidget({
       wrapperClass:"card kpi", dataAttr:` data-kpi-key="${esc(key)}"`, iconKey,
       title:label, value:fmtSpan(rawValue),
@@ -5709,7 +5822,12 @@ function renderPerfOverview(){
     <!-- Round 50: always shown now (used to require multiBrand or multiPlatform) -- Time-Based
          Benchmarking, one of the two analysis types behind this button, works even for a
          single brand on a single platform. See renderBenchmarkTypeChooser(). -->
-    <div style="margin-bottom:14px"><button class="benchmark-view-btn" id="openBenchmarkViewBtn" type="button">⇄ Benchmark view</button></div>
+    <!-- The gap above this button collapses with .overview-summary-card's own margin-bottom
+         (20px, a shared class used elsewhere too, so left alone) -- matching this div's own
+         margin-bottom to that same 20px (was 14px) makes the button sit centered between the
+         Overview box's bottom border and the first KPI card's top border, instead of closer to
+         one side. -->
+    <div style="margin-bottom:20px"><button class="benchmark-view-btn" id="openBenchmarkViewBtn" type="button">⇄ Benchmark view</button></div>
     <div class="grid grid-kpi">
       ${storyOnlyFilter ? "" : kpiTile("posts","posts","Total posts","Total posts",t.posts,"sparkPosts",
         P.date_from?`${formatDatePretty(P.date_from)} → ${formatDatePretty(P.date_to)}`:"&nbsp;")}
@@ -6259,7 +6377,7 @@ function renderPerfPlatformCombo(P, granularity, containerId){
   const legendHTML = platforms.map((pf,i)=>`
     <span class="brand-legend-item" data-platform-idx="${i}" dir="auto"
       style="display:inline-flex;align-items:center;gap:6px;margin:0 14px 6px 0;font-size:12px;cursor:pointer;${manualHidden[i]?'opacity:.4;text-decoration:line-through;':''}">
-      <span style="width:10px;height:10px;border-radius:2px;background:${esc(colorMap[pf])};display:inline-block"></span>${platformIconHTML(pf)} ${esc(pf)}
+      <span style="width:10px;height:10px;border-radius:2px;background:${esc(colorMap[pf])};display:inline-block"></span>${esc(pf)}
     </span>`).join("");
   const legendEl = $("perfPlatformComboLegend");
   legendEl.innerHTML = legendHTML;
@@ -8417,7 +8535,9 @@ function benchmarkKpiCardsHTML(brand, t, P){
   ];
   return metrics.filter(m=>!removed.includes(m.key)).map(m=>{
     const value = benchmarkMetricValue(m.key, brand, t, P);
-    const isZero = !value && BIGD_ZERO_REMOVABLE_KPI_KEYS.includes(m.key);
+    // Round 99: same single-owned-brand guard as the Overview KPI tiles -- never offer to
+    // remove a zero-value card when there's only one (owned) brand in the whole dashboard.
+    const isZero = !value && BIGD_ZERO_REMOVABLE_KPI_KEYS.includes(m.key) && !isSingleOwnedBrandScope();
     const deltaHtml = baselineBrand ? bigdPctChangeHTML(value, benchmarkMetricValue(m.key, baselineBrand, baselineT, baselineP)) : "";
     // Round 74: the label dropped its "brand: " prefix (round 49's own reasoning) -- removing
     // this "x" now removes the metric from EVERY compared entity in one action (see
@@ -8479,7 +8599,66 @@ function benchmarkGranToggleHTML(granularity){
   </div>`;
 }
 function benchmarkSectionRowHTML(boxesHTML){
-  return `<div class="benchmark-section-row" style="grid-template-columns:repeat(${boxesHTML.length},1fr)">${boxesHTML.join("")}</div>`;
+  const n = boxesHTML.length;
+  // Round 100: once more than 5 columns are being compared at once, cap every column to a
+  // fixed "5 fit on screen" width (grid-auto-columns) and let the row scroll horizontally,
+  // instead of squeezing all N columns into view via repeat(N,1fr) -- keeps every card
+  // readable no matter how many brands/platforms are being compared. The 80px in the
+  // calc() is 4 gaps at this row's own 20px gap (5 visible columns have 4 gaps between
+  // them). See syncBenchmarkColScroll() for the shared scrollbar that drives every one of
+  // these rows (there's one per section) in lockstep.
+  if(n>5){
+    return `<div class="benchmark-section-row benchmark-section-row-scrollable" style="grid-auto-flow:column;grid-auto-columns:calc((100% - 80px)/5)">${boxesHTML.join("")}</div>`;
+  }
+  return `<div class="benchmark-section-row" style="grid-template-columns:repeat(${n},1fr)">${boxesHTML.join("")}</div>`;
+}
+// Round 100: lazily creates (once) the one shared horizontal-scroll strip for Brand/Platform
+// Comparison's 6+-column layout -- appended directly to <body> (same pattern as
+// bigdDotNavEl()) so it survives every #benchmarkViewBody re-render without needing its
+// listeners rebound each time render itself only calls syncBenchmarkColScroll() to
+// show/hide/rewire it.
+function benchmarkColScrollbarEl(){
+  let el = document.getElementById("benchmarkColScrollbar");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "benchmarkColScrollbar";
+    el.className = "benchmark-col-scrollbar";
+    el.innerHTML = `<div class="benchmark-col-scrollbar-inner"></div>`;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+// Round 100: once Brand/Platform Comparison has more than 5 columns, every
+// .benchmark-section-row (header, timeline, split, media, top/lowest posts -- one per
+// section) scrolls horizontally on its own, but 6+ separate native scrollbars stacked down
+// a long modal would be unusable. This wires ONE shared strip, fixed to the bottom of the
+// benchmark panel (see its CSS), that drives every row's scrollLeft in lockstep, and mirrors
+// any row's own native scroll (trackpad/touch drag) back into the strip and every other row
+// -- dragging any one of them keeps all the others aligned to the same column.
+function syncBenchmarkColScroll(){
+  const bar = benchmarkColScrollbarEl();
+  const body = $("benchmarkViewBody");
+  const rows = qsa(".benchmark-section-row-scrollable", body);
+  const overlay = $("benchmarkViewOverlay");
+  if(!rows.length || !overlay.classList.contains("show")){
+    bar.classList.remove("show");
+    return;
+  }
+  bar.classList.add("show");
+  const inner = bar.querySelector(".benchmark-col-scrollbar-inner");
+  const first = rows[0];
+  const maxScroll = Math.max(0, first.scrollWidth - first.clientWidth);
+  inner.style.width = (bar.clientWidth + maxScroll) + "px";
+  let syncing = false;
+  const setAll = (val, sourceEl)=>{
+    if(syncing) return;
+    syncing = true;
+    if(sourceEl!==bar) bar.scrollLeft = val;
+    rows.forEach(r=>{ if(r!==sourceEl) r.scrollLeft = val; });
+    syncing = false;
+  };
+  bar.onscroll = ()=> setAll(bar.scrollLeft, bar);
+  rows.forEach(r=>{ r.onscroll = ()=> setAll(r.scrollLeft, r); });
 }
 function renderBenchmarkHalfCharts(brand){
   const slug = benchmarkSlug(brand);
@@ -9144,6 +9323,11 @@ function renderBenchmarkView(){
     benchmarkSectionRowHTML(activeBrands.map(b=>benchmarkPostsBoxHTML(b))) +
     benchmarkSectionTitleHTML(`Lowest 10 posts`, "", `By ${esc(engagementMetricLabel().toLowerCase())}`) +
     benchmarkSectionRowHTML(activeBrands.map(b=>benchmarkLowestPostsBoxHTML(b)));
+  // Round 100: drives the per-column date pickers' calendar-icon suppression (see this
+  // class's CSS) -- kept on the body wrapper rather than each row so it only has to be
+  // computed once per render, from the same activeBrands.length every section row above
+  // already sized itself against.
+  body.classList.toggle("benchmark-scroll-mode", activeBrands.length>=6);
   activeBrands.forEach(b=>renderBenchmarkHalfCharts(b));
   // fmtSpan() renders every KPI number as a count-up span that starts at literal "0" and
   // only fills in once animateCounters() walks the DOM and animates it up to data-target --
@@ -9152,6 +9336,7 @@ function renderBenchmarkView(){
   animateCardsIn(body);
   animateCounters(body);
   bigdSyncKpiCardWidths(body);
+  syncBenchmarkColScroll();
 }
 function toggleBenchmarkBrand(entity){
   const valid = benchmarkColumnEntities();
@@ -9206,6 +9391,11 @@ function closeBenchmarkView(){
   // time -- everything else about the modal's own state (brands, platforms, ranges, filters,
   // sort, chooser step) is untouched here, exactly as before this round.
   closeBenchmarkPostDetail();
+  // Round 100: the shared column-scroll strip lives on <body>, outside this overlay's own
+  // markup -- it has to be hidden explicitly on close, or it would keep floating over the
+  // dashboard underneath after the modal itself is gone.
+  const scrollBar = document.getElementById("benchmarkColScrollbar");
+  if(scrollBar) scrollBar.classList.remove("show");
 }
 // ============================================================
 // Round 50: Benchmark View analysis-type split.
@@ -9711,7 +9901,8 @@ function timeBenchKpiCardsHTML(rangeIdx){
     // Round 82 (supersedes round 60's "zero-value-only" rule): scoped to the same
     // BIGD_ZERO_REMOVABLE_KPI_KEYS (Reach/Impressions/Video views) as the Brand/Platform
     // branch -- see that constant's own comment.
-    const isZero = !value && BIGD_ZERO_REMOVABLE_KPI_KEYS.includes(m.key);
+    // Round 99: same single-owned-brand guard as everywhere else this "x" appears.
+    const isZero = !value && BIGD_ZERO_REMOVABLE_KPI_KEYS.includes(m.key) && !isSingleOwnedBrandScope();
     // Round 62: Followers renders as a full, non-abbreviated whole number ("12,450", never
     // "12.5K") per explicit request -- every other metric keeps the normal K/M-abbreviated
     // count-up. Scoped to Performance Over Time only; Brand & Platform Comparison's own
@@ -10168,9 +10359,14 @@ function brandIntelVideoShare(agg){
   return videoPosts/total;
 }
 function brandNameB(name){ return `<b dir="auto">${esc(name)}</b>`; }
+// Round 97: restyled from the "OBSERVATION" label + bulleted list into the same visual as the
+// performance radar's insight panel (.bigd-radar-insights-list) -- each line becomes its own
+// gray, rounded box instead of a dot in a shared list, for consistency across every Comparison
+// insights panel (Trend, Media, and the old bundle's brand/platform table card all share this
+// one wrapper). No behavior change -- still just wraps whatever lines each caller computed.
 function brandIntelInsightsWrapHTML(lines){
   if(!lines || !lines.length) return "";
-  return `<div class="brand-intel-obs-label">Observation</div><ul>${lines.map(l=>`<li>${l}</li>`).join("")}</ul>`;
+  return `<ul class="bigd-radar-insights-list">${lines.map(l=>`<li>${l}</li>`).join("")}</ul>`;
 }
 function brandIntelTableInsightsHTML(slices, metricLbl){
   if(slices.length<2) return "";
@@ -10721,7 +10917,46 @@ function perfPlatformMixMetrics(mixDefs){
   }
   return sel;
 }
-function perfPlatformMixSectionHTML(mixDefs){
+// Round 97: renders the Platform mix widget's 100%-stacked bars as the same HTML/CSS
+// flex-segment bars the Media Analysis widget uses (.brand-media-row/.brand-media-bar/
+// .brand-media-seg), instead of a Chart.js canvas column chart -- explicitly requested to match
+// that widget's visual. The percentile-rank normalization is unchanged: each selected metric is
+// still rank-normalized across platforms (bigdPercentileRanks) before being re-summed to 100%
+// per platform, so differently-scaled metrics (Posts vs. Engagement) both get real visual weight.
+// Round 98: flipped the axis this widget stacks on. It used to be one bar PER PLATFORM, with
+// segments = the selected metrics, each platform's own bar summing to 100% (a composition view:
+// "of Nova's activity, how much is posts vs. engagement"). Per explicit correction, the 100%
+// now has to belong to the METRIC across every platform, not to a single platform's own mix --
+// so this is now one bar PER SELECTED METRIC, with segments = platforms, each metric's own bar
+// summing to 100% ("of all posts across every platform, X% happened on Instagram"). Plain
+// share-of-total (raw value / metric's grand total) replaces the old percentile-rank trick --
+// that trick existed only to make differently-scaled metrics stack together meaningfully in one
+// platform's bar, which no longer applies once a bar holds exactly one metric.
+function perfPlatformMixBarsHTML(P, mixDefs){
+  const selectedKeys = perfPlatformMixMetrics(mixDefs);
+  const selDefs = selectedKeys.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
+  if(selDefs.length<2) return "";
+  const platforms = P.platforms||[];
+  const byPf = {};
+  (P.byPlatform||[]).forEach(p=>{ byPf[p.platform] = p; });
+  const colorMap = entityColorMap(platforms, "platform");
+  const rows = selDefs.map(d=>{
+    const raws = platforms.map(pf=> byPf[pf] ? d.value(byPf[pf]) : 0);
+    const total = raws.reduce((a,b)=>a+b,0);
+    const bar = platforms.map((pf,i)=>{
+      // No platform has any of this metric at all -- split the bar evenly rather than dividing
+      // by zero into a blank, invisible bar.
+      const share = total>0 ? (raws[i]/total*100) : (100/platforms.length);
+      const shareR = Math.round(share*10)/10;
+      const color = colorMap[pf] || "#3b82f6";
+      return `<div class="brand-media-seg" style="flex:${share};background:${esc(color)};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:2px" title="${esc(pf)}: ${shareR}% of total ${esc(d.shortLabel.toLowerCase())} (${esc(perfPlatformMetricFmt(d, raws[i]))})">${shareR>=8?`${esc(pf)} ${shareR}%`:""}</div>`;
+    }).join("");
+    return `<div class="brand-media-row"><div class="name" dir="auto">${esc(d.shortLabel)}</div><div class="brand-media-bar">${bar}</div></div>`;
+  }).join("");
+  const legend = platforms.map(pf=>`<span><span class="sw" style="background:${esc(colorMap[pf]||"#3b82f6")}"></span>${esc(pf)}</span>`).join("");
+  return `${rows}<div class="brand-media-legend">${legend}</div>`;
+}
+function perfPlatformMixSectionHTML(mixDefs, P){
   if(mixDefs.length<2) return "";
   const selected = perfPlatformMixMetrics(mixDefs);
   const selDefs = selected.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
@@ -10734,9 +10969,9 @@ function perfPlatformMixSectionHTML(mixDefs){
     return `<button type="button" class="perf-metric-vbtn${isSel?" active":""}" data-metric-key="${esc(d.key)}">${esc(d.shortLabel)}</button>`;
   }).join("");
   return `<div class="card" style="margin-bottom:16px"><h3>Platform mix <span class="sub">${esc(subtitle)}</span></h3>
-    <p class="foot" style="margin:-4px 0 12px">Pick at least 2 metrics to see how each platform's activity splits between them.</p>
+    <p class="foot" style="margin:-4px 0 12px">Pick at least 2 metrics to see how each metric's total splits across platforms.</p>
     <div class="perf-platform-chart-row">
-      <div class="chart-wrap" style="min-height:220px"><canvas id="perfPlatformMixChart"></canvas></div>
+      <div style="flex:1;min-width:0">${perfPlatformMixBarsHTML(P, mixDefs)}</div>
       <div class="perf-metric-vbtns" id="perfPlatformMixBtns">${btns}</div>
     </div>
   </div>`;
@@ -10926,7 +11161,7 @@ function renderPerfPlatformEfficiencySectionHTML(P, defs){
   if(!defs.length) return "";
   return perfPlatformEfficiencyTableHTML(P, defs)
     + perfPlatformChartSectionHTML(defs)
-    + perfPlatformMixSectionHTML(perfPlatformMixDefs(defs))
+    + perfPlatformMixSectionHTML(perfPlatformMixDefs(defs), P)
     + perfBestPostPerPlatformSectionHTML(P, defs)
     + perfPlatformRadarSectionHTML(P, defs);
 }
@@ -10991,55 +11226,10 @@ const PERF_PLATFORM_METRIC_COLORS = { posts:"#8b5cf6", engagement:"#ec4899", avg
 // bigdPercentileRanks), then those ranks are re-normalized per platform so ITS OWN stack always
 // sums to exactly 100%. A platform that's simply strong across every selected metric shows a
 // fairly even split; one that only stands out in a single metric shows a dominant segment.
-function renderPerfPlatformMixChart(P, mixDefs){
-  destroyChart("perfPlatformMix");
-  const chartEl = $("perfPlatformMixChart");
-  if(!chartEl || mixDefs.length<2) return;
-  const selectedKeys = perfPlatformMixMetrics(mixDefs);
-  const selDefs = selectedKeys.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
-  if(selDefs.length<2) return;
-  const platforms = P.platforms||[];
-  const byPf = {};
-  (P.byPlatform||[]).forEach(p=>{ byPf[p.platform] = p; });
-  const rankSeries = {};
-  selDefs.forEach(d=>{ rankSeries[d.key] = bigdPercentileRanks(platforms.map(pf=> byPf[pf]?d.value(byPf[pf]):0)); });
-  const shareSeries = {};
-  selDefs.forEach(d=> shareSeries[d.key] = []);
-  platforms.forEach((pf,i)=>{
-    const ranks = selDefs.map(d=>rankSeries[d.key][i]);
-    const sum = ranks.reduce((a,b)=>a+b,0);
-    // A platform that's dead last in every selected metric has a rank of 0 everywhere -- split
-    // its bar evenly rather than dividing by zero into a blank, invisible bar.
-    selDefs.forEach((d,di)=>{
-      const share = sum>0 ? (ranks[di]/sum*100) : (100/selDefs.length);
-      shareSeries[d.key].push(share);
-    });
-  });
-  const datasets = selDefs.map(d=>({
-    label: d.shortLabel,
-    data: shareSeries[d.key],
-    backgroundColor: PERF_PLATFORM_METRIC_COLORS[d.key] || "#3b82f6"
-  }));
-  charts.perfPlatformMix = new Chart(chartEl.getContext("2d"), {
-    type:"bar",
-    data:{ labels: platforms, datasets },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{ display:true, position:"bottom", labels:{boxWidth:10,font:{size:11}} },
-        tooltip:{ callbacks:{ label:(item)=>{
-          const d = selDefs[item.datasetIndex];
-          const row = byPf[platforms[item.dataIndex]];
-          const raw = row ? d.value(row) : 0;
-          return `${d.shortLabel}: ${item.parsed.y.toFixed(1)}% of mix (${perfPlatformMetricFmt(d, raw)})`;
-        } } }
-      },
-      scales:{
-        x:{ stacked:true },
-        y:{ stacked:true, min:0, max:100, ticks:{ callback:v=>v+"%" } }
-      }
-    }
-  });
-}
+// Round 97: renderPerfPlatformMixChart (the Chart.js version of this widget) was retired -- the
+// mix widget is now pure HTML (perfPlatformMixBarsHTML, built at section-render time, no
+// separate chart-render pass needed since it's already rebuilt on every renderPerfComparison()
+// call the same way the buttons themselves are).
 function renderPerfPlatformEfficiencyCharts(P, defs){
   if(!defs || !defs.length) return;
   const selectedKeys = perfPlatformChartMetrics(defs);
@@ -11078,7 +11268,6 @@ function renderPerfPlatformEfficiencyCharts(P, defs){
       plugins:[barValueLabelsPlugin]
     });
   }
-  renderPerfPlatformMixChart(P, perfPlatformMixDefs(defs));
   destroyChart("perfPlatformRadar");
   const radarEl = $("perfPlatformRadarChart");
   if(radarEl){
@@ -11255,7 +11444,36 @@ function perfBrandMixMetrics(mixDefs){
   }
   return sel;
 }
-function perfBrandMixSectionHTML(mixDefs){
+// Round 97: Brand mix's own HTML/CSS flex-segment bars, mirroring perfPlatformMixBarsHTML --
+// same .brand-media-row/.brand-media-bar/.brand-media-seg markup the Media Analysis widget uses,
+// keyed by brand instead of platform. Percentile-rank normalization unchanged.
+// Round 98: same axis-flip as perfPlatformMixBarsHTML -- one bar PER SELECTED METRIC (not per
+// brand), segments = brands, each metric's own bar summing to 100% across every brand. Plain
+// share-of-total replaces the old percentile-rank normalization for the same reason: that trick
+// only mattered when different metrics had to share one brand's single 100% bar.
+function perfBrandMixBarsHTML(P, mixDefs){
+  const selectedKeys = perfBrandMixMetrics(mixDefs);
+  const selDefs = selectedKeys.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
+  if(selDefs.length<2) return "";
+  const brands = P.profiles||[];
+  const byP = {};
+  (P.byProfile||[]).forEach(p=>{ byP[p.profile] = p; });
+  const colorMap = entityColorMap(brands, "brand");
+  const rows = selDefs.map(d=>{
+    const raws = brands.map(p=> byP[p] ? d.value(byP[p]) : 0);
+    const total = raws.reduce((a,b)=>a+b,0);
+    const bar = brands.map((p,i)=>{
+      const share = total>0 ? (raws[i]/total*100) : (100/brands.length);
+      const shareR = Math.round(share*10)/10;
+      const color = colorMap[p] || "#3b82f6";
+      return `<div class="brand-media-seg" style="flex:${share};background:${esc(color)};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:2px" title="${esc(p)}: ${shareR}% of total ${esc(d.shortLabel.toLowerCase())} (${esc(perfPlatformMetricFmt(d, raws[i]))})">${shareR>=8?`${esc(p)} ${shareR}%`:""}</div>`;
+    }).join("");
+    return `<div class="brand-media-row"><div class="name" dir="auto">${esc(d.shortLabel)}</div><div class="brand-media-bar">${bar}</div></div>`;
+  }).join("");
+  const legend = brands.map(p=>`<span><span class="sw" style="background:${esc(colorMap[p]||"#3b82f6")}"></span>${esc(p)}</span>`).join("");
+  return `${rows}<div class="brand-media-legend">${legend}</div>`;
+}
+function perfBrandMixSectionHTML(mixDefs, P){
   if(mixDefs.length<2) return "";
   const selected = perfBrandMixMetrics(mixDefs);
   const selDefs = selected.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
@@ -11268,9 +11486,9 @@ function perfBrandMixSectionHTML(mixDefs){
     return `<button type="button" class="perf-metric-vbtn${isSel?" active":""}" data-metric-key="${esc(d.key)}">${esc(d.shortLabel)}</button>`;
   }).join("");
   return `<div class="card" style="margin-bottom:16px"><h3>Brand mix <span class="sub">${esc(subtitle)}</span></h3>
-    <p class="foot" style="margin:-4px 0 12px">Pick at least 2 metrics to see how each brand's activity splits between them.</p>
+    <p class="foot" style="margin:-4px 0 12px">Pick at least 2 metrics to see how each metric's total splits across brands.</p>
     <div class="perf-platform-chart-row">
-      <div class="chart-wrap" style="min-height:220px"><canvas id="perfBrandMixChart"></canvas></div>
+      <div style="flex:1;min-width:0">${perfBrandMixBarsHTML(P, mixDefs)}</div>
       <div class="perf-metric-vbtns" id="perfBrandMixBtns">${btns}</div>
     </div>
   </div>`;
@@ -11438,7 +11656,7 @@ function renderPerfBrandEfficiencySectionHTML(P, defs){
   if(!defs.length) return "";
   return perfBrandEfficiencyTableHTML(P, defs)
     + perfBrandChartSectionHTML(defs)
-    + perfBrandMixSectionHTML(perfBrandMixDefs(defs))
+    + perfBrandMixSectionHTML(perfBrandMixDefs(defs), P)
     + perfBestPostPerBrandSectionHTML(P, defs)
     + perfBrandRadarSectionHTML(P, defs);
 }
@@ -11481,53 +11699,9 @@ function bindPerfBrandEfficiencySection(P, defs){
     renderPerfComparison();
   });
 }
-function renderPerfBrandMixChart(P, mixDefs){
-  destroyChart("perfBrandMix");
-  const chartEl = $("perfBrandMixChart");
-  if(!chartEl || mixDefs.length<2) return;
-  const selectedKeys = perfBrandMixMetrics(mixDefs);
-  const selDefs = selectedKeys.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
-  if(selDefs.length<2) return;
-  const brands = P.profiles||[];
-  const byP = {};
-  (P.byProfile||[]).forEach(p=>{ byP[p.profile] = p; });
-  const rankSeries = {};
-  selDefs.forEach(d=>{ rankSeries[d.key] = bigdPercentileRanks(brands.map(p=> byP[p]?d.value(byP[p]):0)); });
-  const shareSeries = {};
-  selDefs.forEach(d=> shareSeries[d.key] = []);
-  brands.forEach((p,i)=>{
-    const ranks = selDefs.map(d=>rankSeries[d.key][i]);
-    const sum = ranks.reduce((a,b)=>a+b,0);
-    selDefs.forEach((d,di)=>{
-      const share = sum>0 ? (ranks[di]/sum*100) : (100/selDefs.length);
-      shareSeries[d.key].push(share);
-    });
-  });
-  const datasets = selDefs.map(d=>({
-    label: d.shortLabel,
-    data: shareSeries[d.key],
-    backgroundColor: PERF_PLATFORM_METRIC_COLORS[d.key] || "#3b82f6"
-  }));
-  charts.perfBrandMix = new Chart(chartEl.getContext("2d"), {
-    type:"bar",
-    data:{ labels: brands, datasets },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{ display:true, position:"bottom", labels:{boxWidth:10,font:{size:11}} },
-        tooltip:{ callbacks:{ label:(item)=>{
-          const d = selDefs[item.datasetIndex];
-          const row = byP[brands[item.dataIndex]];
-          const raw = row ? d.value(row) : 0;
-          return `${d.shortLabel}: ${item.parsed.y.toFixed(1)}% of mix (${perfPlatformMetricFmt(d, raw)})`;
-        } } }
-      },
-      scales:{
-        x:{ stacked:true },
-        y:{ stacked:true, min:0, max:100, ticks:{ callback:v=>v+"%" } }
-      }
-    }
-  });
-}
+// Round 97: renderPerfBrandMixChart (the Chart.js version) was retired -- the Brand mix widget
+// is now pure HTML (perfBrandMixBarsHTML), same as the platform version, rebuilt automatically
+// on every renderPerfComparison() call so no separate chart-render pass is needed.
 function renderPerfBrandEfficiencyCharts(P, defs){
   if(!defs || !defs.length) return;
   const selectedKeys = perfBrandChartMetrics(defs);
@@ -11566,7 +11740,6 @@ function renderPerfBrandEfficiencyCharts(P, defs){
       plugins:[barValueLabelsPlugin]
     });
   }
-  renderPerfBrandMixChart(P, perfBrandMixDefs(defs));
   destroyChart("perfBrandRadar");
   const radarEl = $("perfBrandRadarChart");
   if(radarEl){
@@ -11827,6 +12000,7 @@ function renderPerfPosts(){
       <button class="brand-pill ${localContentType==='all'?'active':''}" data-pill-type="contentType" data-value="all">All content types</button>
       ${allContentTypes.map(ct=>`<button class="brand-pill ${localContentType===ct?'active':''}" data-pill-type="contentType" data-value="${esc(ct)}">${esc(ct)}</button>`).join("")}
     </div>` : ""}
+    <div class="table-scroll-top" id="perfPostsScrollTop"><div class="table-scroll-top-inner"></div></div>
     <div class="card">
       <table class="datatable">
         <thead><tr>
@@ -11894,6 +12068,40 @@ function renderPerfPosts(){
       renderPerfPosts();
     });
   });
+  syncPerfPostsTopScroll();
+}
+
+// Round 99: the Post Performance table already gets a horizontal scrollbar at the bottom
+// for free from the shared .card{overflow-x:auto} rule, but on a long table a user has to
+// scroll all the way down just to find it -- this mirrors a second scrollbar at the TOP,
+// a thin sibling strip (#perfPostsScrollTop, see markup above and CSS below) kept in sync
+// with the real .card's scrollLeft. The strip's inner div is sized in JS (not CSS) because
+// its width has to match the table's actual rendered scroll range, which is only known
+// after the table has been laid out.
+function syncPerfPostsTopScroll(){
+  const wrap = $("view-perf-posts");
+  if(!wrap) return;
+  const card = wrap.querySelector(".card");
+  const topBar = $("perfPostsScrollTop");
+  if(!card || !topBar) return;
+  const inner = topBar.querySelector(".table-scroll-top-inner");
+  if(!inner) return;
+  const maxScroll = card.scrollWidth - card.clientWidth;
+  if(maxScroll<=1){
+    topBar.style.display = "none";
+    return;
+  }
+  topBar.style.display = "";
+  inner.style.width = (topBar.clientWidth + maxScroll) + "px";
+  let syncing = false;
+  topBar.onscroll = ()=>{
+    if(syncing) return;
+    syncing = true; card.scrollLeft = topBar.scrollLeft; syncing = false;
+  };
+  card.onscroll = ()=>{
+    if(syncing) return;
+    syncing = true; topBar.scrollLeft = card.scrollLeft; syncing = false;
+  };
 }
 
 function renderPlatformPostPreview(post){
@@ -13160,6 +13368,7 @@ function renderPerformanceDashboard(){
   renderPerfQuality();
   animateCardsIn(root);
   animateCounters(root);
+  buildDotNav();
 }
 
 /* ============================================================
@@ -13222,6 +13431,73 @@ function buildNav(){
       showView(btn.dataset.view);
     });
   });
+  // Round 98: keep the dot nav's own section list in sync with the sidebar's -- buildNav() is
+  // the one function every mode switch reliably calls (see applyMode()), so this catches the
+  // "content already exists, just switching back to an already-rendered mode" case. The
+  // "brand-new render, sections don't exist in the DOM yet" case is separately covered by the
+  // buildDotNav() calls at the end of renderAll()/renderPerformanceDashboard() themselves.
+  buildDotNav();
+}
+
+/* ============================================================
+   VERTICAL DOT NAVIGATION (scrollspy)
+   A small, fixed dot-nav pinned to the right edge of the viewport, mirroring the sidebar's own
+   section list (currentNavList()) one-for-one -- same ids, same order, same labels -- but as
+   numbered circular dots instead of a text list, so it stays usable even when the sidebar isn't
+   the focus (or is collapsed on narrower Performance layouts). Clicking a dot reuses the exact
+   same activation path as clicking the matching sidebar item (STATE.activeView + showView()), so
+   the sidebar's own active-item highlight and Listening's blur-the-rest effect stay correct.
+   An IntersectionObserver watching a thin band near vertical-center of the viewport (not simple
+   visibility) drives which dot is "active" while scrolling -- robust across sections of wildly
+   different heights, and never leaves the nav with no active dot at all (only reacts to a
+   section entering the band, never clears on exit, so the previous dot stays lit until another
+   one takes over).
+   ============================================================ */
+let bigdDotNavObserver = null;
+function bigdDotNavEl(){
+  let el = document.getElementById("bigdDotNav");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "bigdDotNav";
+    el.className = "bigd-dotnav";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function buildDotNav(){
+  const el = bigdDotNavEl();
+  if(bigdDotNavObserver){ bigdDotNavObserver.disconnect(); bigdDotNavObserver = null; }
+  // No usable nav yet (wizard not finished), or the Quick Performance Overview page (which is
+  // deliberately sidebar-free/nav-free per applyMode()'s own comment) -- match that same
+  // "nothing to navigate" treatment here instead of showing a dot nav pointing at nothing.
+  if(isSidebarLocked() || STATE.mode==="quickPerf"){ el.innerHTML = ""; el.classList.remove("show"); return; }
+  const list = currentNavList().filter(n=> $("view-"+n.id));
+  // A single section has nothing to navigate between -- skip rather than show one lonely dot.
+  if(list.length<2){ el.innerHTML = ""; el.classList.remove("show"); return; }
+  el.classList.add("show");
+  el.innerHTML = list.map((n,i)=>`
+    <button type="button" class="bigd-dotnav-dot" data-view="${esc(n.id)}" aria-label="${esc(n.label)}">
+      <span class="bigd-dotnav-num">${i+1}</span>
+      <span class="bigd-dotnav-tooltip">${esc(n.label)}</span>
+    </button>`).join("");
+  qsa(".bigd-dotnav-dot", el).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.dataset.view;
+      if(isSidebarLocked()) return;
+      STATE.activeView = id;
+      qsa(".navitem").forEach(b=>b.classList.toggle("active", b.dataset.view===id));
+      qsa(".bigd-dotnav-dot", el).forEach(b=>b.classList.toggle("active", b===btn));
+      showView(id);
+    });
+  });
+  bigdDotNavObserver = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting) return;
+      const id = entry.target.id.replace(/^view-/,"");
+      qsa(".bigd-dotnav-dot", el).forEach(b=> b.classList.toggle("active", b.dataset.view===id));
+    });
+  }, { root:null, rootMargin:"-40% 0px -55% 0px", threshold:0 });
+  list.forEach(n=>{ const sec = $("view-"+n.id); if(sec) bigdDotNavObserver.observe(sec); });
 }
 function showView(id){
   const rootSel = STATE.mode==="performance" ? "#performanceRoot" : "#listeningRoot";
@@ -14816,7 +15092,12 @@ function finalizePerformanceBuild(){
   STATE.perfComparisonPlatform = "all";
   STATE.perfFilterOpenKey = null;
   STATE.perfDateFilter = {dateFrom:null, dateTo:null};
-  STATE.perfEngagementMetric = "interactions";
+  const brands = WZ.perf.brands.filter(Boolean);
+  // Round 99: a single OWNED brand (any number of platforms) defaults the global engagement
+  // metric to "Engagements" instead of "Total Interactions" -- everywhere else (multi-brand,
+  // or a single Public account) keeps the original "Total Interactions" default.
+  STATE.perfEngagementMetric = (brands.length===1 && WZ.perf.brandAccountType[0]==="owned")
+    ? "engagements" : "interactions";
   STATE.perfPostsBrandFilter = "all";
   STATE.perfPostsPlatformFilter = "all";
   STATE.perfPostsMediaTypeFilter = "all";
@@ -14834,7 +15115,6 @@ function finalizePerformanceBuild(){
   STATE.timeBenchMediaTypes = null;
   STATE.timeBenchContentTypes = null;
   STATE.timeBenchRanges = null;
-  const brands = WZ.perf.brands.filter(Boolean);
   if(brands.length===1){
     STATE.client.name = brands[0];
     if(WZ.perf.brandAssets[0] && WZ.perf.brandAssets[0].accent) STATE.client.accent = WZ.perf.brandAssets[0].accent;
