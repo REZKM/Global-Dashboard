@@ -2172,6 +2172,25 @@ body.mode-performance .bigd-filter-undo{border-color:#f59e0b;color:#f59e0b;}
 .bigd-radar-insights-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;}
 .bigd-radar-insights-list li{font-size:12px;line-height:1.5;color:var(--text);background:var(--neutral-soft);border-radius:8px;padding:8px 10px;}
 @media(max-width:1000px){.bigd-radar-split{flex-direction:column;}.bigd-radar-insights,.bigd-radar-chart-col{flex:1 1 auto;}}
+/* Round 91: single-brand/multi-platform Comparison -- metric-switchable platform ranking
+   chart (vertical button rail beside the chart, not a horizontal row, per explicit request)
+   and the best-post-per-platform card grid + its metric <select>. */
+.perf-platform-chart-row{display:flex;gap:16px;align-items:stretch;}
+.perf-platform-chart-row .chart-wrap{flex:1;min-width:0;}
+.perf-metric-vbtns{display:flex;flex-direction:column;gap:6px;flex:0 0 136px;}
+.perf-metric-vbtn{background:var(--neutral-soft);border:none;border-radius:7px;padding:7px 10px;font-size:11px;font-weight:600;color:var(--text-muted);cursor:pointer;text-align:left;white-space:nowrap;}
+.perf-metric-vbtn:hover{background:var(--accent-soft);color:var(--accent-dark);}
+.perf-metric-vbtn.active{background:var(--accent-soft);color:var(--accent-dark);}
+.perf-metric-vbtn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;}
+@media(max-width:700px){.perf-platform-chart-row{flex-direction:column;}.perf-metric-vbtns{flex-direction:row;flex-wrap:wrap;flex:0 0 auto;}}
+.perf-metric-select{padding:6px 10px;border:1px solid var(--card-border);border-radius:8px;font-size:12.5px;background:var(--card-bg);color:var(--text);}
+.perf-best-post-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.perf-best-post-card{background:var(--neutral-soft);border-radius:8px;padding:10px 12px;}
+.perf-best-post-pf{font-size:11.5px;font-weight:700;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.perf-best-post-caption{font-size:12.5px;margin-bottom:6px;line-height:1.4;}
+.perf-best-post-val{font-size:12.5px;font-weight:700;}
+.perf-best-post-card a{color:inherit;text-decoration:none;display:block;}
+.perf-best-post-card a:hover .perf-best-post-caption{text-decoration:underline;}
 @media(max-width:1100px){ .bigd-g-3,.bigd-g-4{grid-column:span 6;} .bigd-g-6,.bigd-g-8,.bigd-g-9{grid-column:span 12;} }
 @media(max-width:700px){ .bigd-g-3,.bigd-g-4,.bigd-g-6,.bigd-g-8,.bigd-g-9{grid-column:span 12;} }
 
@@ -5945,9 +5964,12 @@ function renderPerfBrandCombo(P, granularity, containerId){
     borderColor:colorMap[b], backgroundColor:colorMap[b],
     tension:.25, pointRadius:2, pointHoverRadius:4, borderWidth:2
   }));
+  // Round 96: was a bar chart -- now a smoothed line, matching the Posts chart above it, per
+  // explicit request.
   const barDatasets = brands.map((b,i)=>({
     label:b, data: buckets.map(k=>interactionsByBrand[i][k]||0),
-    borderColor:colorMap[b], backgroundColor:colorMap[b]
+    borderColor:colorMap[b], backgroundColor:colorMap[b],
+    tension:.25, pointRadius:2, pointHoverRadius:4, borderWidth:2
   }));
 
   const lineCtx = $("perfBrandLineChart").getContext("2d");
@@ -5973,7 +5995,7 @@ function renderPerfBrandCombo(P, granularity, containerId){
 
   const barCtx = $("perfBrandBarChart").getContext("2d");
   charts.perfBrandBar = new Chart(barCtx, {
-    type:"bar",
+    type:"line",
     data:{ labels: buckets, datasets: barDatasets },
     options:{
       responsive:true, maintainAspectRatio:false,
@@ -6030,6 +6052,234 @@ function renderPerfBrandCombo(P, granularity, containerId){
   // the count-up cards' text nodes stay frozen at their initial "0" forever on those two
   // paths (only a full dashboard rebuild — e.g. clicking Reset filters — would catch them),
   // which is exactly the "cards zero out" bug this fixes.
+  animateCardsIn(container);
+  animateCounters(container);
+}
+
+// ============================================================
+// Round 96: 1 brand x many platforms gets the same Monthly Trend / Media Analysis / Posts &
+// Interactions combo widgets that many-brands x 1-platform keeps from the old bundle -- added
+// ALONGSIDE the existing platform efficiency system (rounds 91-94), keyed by PLATFORM instead
+// of brand. brandIntelTrendInsightsHTML/brandIntelMediaInsightsHTML are reused as-is (their
+// text only ever references s.name/s.agg generically -- nothing brand-specific in the wording).
+// ============================================================
+function platformIntelSlices(P){
+  const rows = P.rowsData || [];
+  return (P.platforms||[]).map(name=>({
+    name, agg: aggregatePerformanceRows(rows.filter(r=>r.platform===name))
+  })).sort((a,b)=> b.agg.totals.engagement - a.agg.totals.engagement);
+}
+function perfPlatformIntelTrendCardHTML(slices){
+  return `<div class="card brand-intel-chart-card" style="margin-bottom:16px">
+    <h3>Monthly Interactions Trend</h3>
+    <p class="sub" style="margin:-4px 0 12px">Interactions per month — trajectory matters more than totals</p>
+    <div class="brand-intel-grid">
+      <div class="chart-wrap" style="height:280px"><canvas id="platformIntelTrendChart"></canvas></div>
+      <div class="brand-intel-insights">${brandIntelTrendInsightsHTML(slices)}</div>
+    </div>
+  </div>`;
+}
+function perfPlatformIntelMediaBarsHTML(slices){
+  const allTypes = Array.from(new Set(slices.flatMap(s=>Object.keys(s.agg.mediaType||{})))).sort();
+  if(!allTypes.length) return `<p class="sub">No media-type data in this export.</p>`;
+  const colorMap = entityColorMap(allTypes, "media_type");
+  const rows = slices.filter(s=>s.agg.totals.posts>0).map(s=>{
+    const total = s.agg.totals.posts||1;
+    const segs = allTypes.map(t=>({t, v:(s.agg.mediaType||{})[t]||0})).filter(x=>x.v>0);
+    const bar = segs.map(seg=>{
+      const p = Math.round((seg.v/total)*1000)/10;
+      return `<div class="brand-media-seg" data-platform="${esc(s.name)}" data-media-type="${esc(seg.t)}" style="flex:${seg.v};background:${esc(colorMap[seg.t])};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:2px;cursor:pointer" title="See ${esc(s.name)}'s ${esc(seg.t)} posts — ${p}%">${p>=8?`${esc(seg.t)} ${p}%`:""}</div>`;
+    }).join("");
+    return `<div class="brand-media-row"><div class="name" dir="auto">${platformIconHTML(s.name)} ${esc(s.name)}</div><div class="brand-media-bar">${bar}</div></div>`;
+  }).join("");
+  const legend = allTypes.map(t=>`<span><span class="sw" style="background:${esc(colorMap[t])}"></span>${esc(cap(t))}</span>`).join("");
+  return `${rows}<div class="brand-media-legend">${legend}</div>`;
+}
+function perfPlatformIntelMediaCardHTML(slices){
+  return `<div class="card" style="margin-bottom:16px">
+    <h3>Media Analysis</h3>
+    <p class="sub" style="margin:-4px 0 12px">Share of posts by media type — click a segment to see those posts</p>
+    <div class="brand-intel-grid">
+      <div>${perfPlatformIntelMediaBarsHTML(slices)}</div>
+      <div class="brand-intel-insights">${brandIntelMediaInsightsHTML(slices)}</div>
+    </div>
+  </div>`;
+}
+function renderPlatformIntelTrendChart(P){
+  const slices = platformIntelSlices(P);
+  const active = slices.filter(s=>s.agg.totals.posts>0);
+  const colorMap = entityColorMap(active.map(s=>s.name), "platform");
+  const months = Array.from(new Set(active.flatMap(s=>brandIntelMonthlyBuckets(s.agg).map(p=>p.month)))).sort();
+  destroyChart("platformIntelTrend");
+  const canvas = $("platformIntelTrendChart");
+  if(!canvas || !months.length) return;
+  const datasets = active.map(s=>{
+    const map = bucketDailyMap(s.agg.dailyInteractionsTotal||{}, "monthly");
+    return {
+      label: s.name, data: months.map(m=> map[m]>0 ? map[m] : null), spanGaps:false,
+      borderColor: colorMap[s.name], backgroundColor: colorMap[s.name],
+      tension:.25, pointRadius:3, pointHoverRadius:5, borderWidth:2
+    };
+  });
+  const ctx = canvas.getContext("2d");
+  charts.platformIntelTrend = new Chart(ctx, {
+    type:"line",
+    data:{ labels: months, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"index", intersect:false},
+      plugins:{ legend:{position:"bottom", labels:{boxWidth:10,font:{size:11}}} },
+      scales:{
+        x:{grid:{display:false}},
+        y:{type:"logarithmic", title:{display:true,text:"Interactions (log scale)"}, ticks:{callback:v=>fmt(v)}}
+      }
+    }
+  });
+}
+function bindPerfPlatformIntelMediaBarClicks(){
+  qsa(".brand-media-seg[data-platform]").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const platform = el.dataset.platform, mediaType = el.dataset.mediaType;
+      navigateToTopPostsWithFilter({platform, mediaType}, `Filtered Post Performance to ${platform} · ${mediaType}.`);
+    });
+  });
+}
+// Direct mirror of renderPerfBrandCombo (same 2-chart-plus-cards-plus-interactive-legend
+// structure, same hover-isolate/click-toggle behavior), grouped by PLATFORM instead of brand.
+// Both charts are lines from the start (no bar-to-line change needed here, unlike the brand
+// version's Round 96 update) since this widget is new.
+function renderPerfPlatformCombo(P, granularity, containerId){
+  const container = $(containerId || "view-perf-comparison");
+  if(!container) return;
+  const platforms = (P.platforms||[]).filter(Boolean);
+  if(platforms.length<2) return;
+
+  const colorMap = entityColorMap(platforms, "platform");
+  const rowsByPlatform = platforms.map(pf=>(P.rowsData||[]).filter(r=>r.platform===pf));
+  const aggByPlatform = rowsByPlatform.map(rows=>aggregatePerformanceRows(rows));
+  const postsByPlatform = aggByPlatform.map(a=>bucketDailyMap(a.dailyPostsTotal, granularity));
+  const interactionsByPlatform = aggByPlatform.map(a=>bucketDailyMap(a.dailyInteractionsTotal, granularity));
+  const buckets = Array.from(new Set([].concat(
+    ...postsByPlatform.map(m=>Object.keys(m)),
+    ...interactionsByPlatform.map(m=>Object.keys(m))
+  ))).sort();
+
+  const cardsHTML = platforms.map((pf,i)=>{
+    const t = aggByPlatform[i].totals || {posts:0, engagement:0};
+    return `<div class="card" style="padding:10px 12px;border-left:4px solid ${esc(colorMap[pf])}">
+      <div style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em" dir="auto">${platformIconHTML(pf)} ${esc(pf)}</div>
+      <div style="margin-top:6px">
+        <div style="font-size:17px;font-weight:800">${fmtSpan(t.posts)}</div><div style="font-size:10px;color:var(--text-muted)">Posts</div>
+      </div>
+      <div style="margin-top:6px">
+        <div style="font-size:17px;font-weight:800">${fmtSpan(t.engagement)}</div><div style="font-size:10px;color:var(--text-muted)">${esc(engagementMetricLabel())}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  container.insertAdjacentHTML("beforeend", `
+    <div class="card" style="margin-top:16px">
+      <div class="card-head-row"><h3>Posts &amp; ${esc(engagementMetricLabel())} by platform</h3></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
+        <div style="flex:1 1 360px;min-width:300px;display:flex;flex-direction:column;gap:6px">
+          <div class="chart-wrap" style="height:170px"><canvas id="perfPlatformLineChart"></canvas></div>
+          <div class="chart-wrap" style="height:170px"><canvas id="perfPlatformBarChart"></canvas></div>
+          <div class="pie-legend-row" id="perfPlatformComboLegend" style="margin-top:2px"></div>
+        </div>
+        <div style="flex:0 0 220px;max-width:220px;min-width:170px;display:flex;flex-direction:column;gap:8px">${cardsHTML}</div>
+      </div>
+    </div>`);
+
+  destroyChart("perfPlatformLine");
+  destroyChart("perfPlatformBar");
+  const manualHidden = platforms.map(()=>false);
+  const lockAxisWidth = { afterFit:(scale)=>{ scale.width = 64; } };
+  const kTickCallback = (val)=> fmt(val);
+
+  const lineDatasets = platforms.map((pf,i)=>({
+    label:pf, data: buckets.map(k=>postsByPlatform[i][k]||0),
+    borderColor:colorMap[pf], backgroundColor:colorMap[pf],
+    tension:.25, pointRadius:2, pointHoverRadius:4, borderWidth:2
+  }));
+  const barDatasets = platforms.map((pf,i)=>({
+    label:pf, data: buckets.map(k=>interactionsByPlatform[i][k]||0),
+    borderColor:colorMap[pf], backgroundColor:colorMap[pf],
+    tension:.25, pointRadius:2, pointHoverRadius:4, borderWidth:2
+  }));
+
+  const lineCtx = $("perfPlatformLineChart").getContext("2d");
+  charts.perfPlatformLine = new Chart(lineCtx, {
+    type:"line",
+    data:{ labels: buckets, datasets: lineDatasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"index", intersect:false},
+      onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+      onClick:(evt,elements)=>{
+        if(!elements.length) return;
+        const idx = elements[0].index;
+        openDayDrilldown(buckets[idx], granularity);
+      },
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ticks:{display:false}, grid:{display:false}},
+        y:{beginAtZero:true, title:{display:true,text:"Posts"}, afterFit:lockAxisWidth.afterFit, ticks:{callback:kTickCallback}}
+      }
+    }
+  });
+
+  const barCtx = $("perfPlatformBarChart").getContext("2d");
+  charts.perfPlatformBar = new Chart(barCtx, {
+    type:"line",
+    data:{ labels: buckets, datasets: barDatasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"index", intersect:false},
+      onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+      onClick:(evt,elements)=>{
+        if(!elements.length) return;
+        const idx = elements[0].index;
+        openDayDrilldown(buckets[idx], granularity);
+      },
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ticks:{maxRotation:0,autoSkip:true}},
+        y:{beginAtZero:true, title:{display:true,text:engagementMetricLabel()}, afterFit:lockAxisWidth.afterFit, ticks:{callback:kTickCallback}}
+      }
+    }
+  });
+
+  const applyHidden = ()=>{
+    [charts.perfPlatformLine, charts.perfPlatformBar].forEach(ch=>{
+      if(!ch) return;
+      platforms.forEach((pf,i)=>{ ch.getDatasetMeta(i).hidden = manualHidden[i]; });
+      ch.update();
+    });
+  };
+  const legendHTML = platforms.map((pf,i)=>`
+    <span class="brand-legend-item" data-platform-idx="${i}" dir="auto"
+      style="display:inline-flex;align-items:center;gap:6px;margin:0 14px 6px 0;font-size:12px;cursor:pointer;${manualHidden[i]?'opacity:.4;text-decoration:line-through;':''}">
+      <span style="width:10px;height:10px;border-radius:2px;background:${esc(colorMap[pf])};display:inline-block"></span>${platformIconHTML(pf)} ${esc(pf)}
+    </span>`).join("");
+  const legendEl = $("perfPlatformComboLegend");
+  legendEl.innerHTML = legendHTML;
+  qsa(".brand-legend-item", legendEl).forEach(item=>{
+    const i = Number(item.dataset.platformIdx);
+    item.addEventListener("mouseenter", ()=>{
+      [charts.perfPlatformLine, charts.perfPlatformBar].forEach(ch=>{
+        platforms.forEach((pf,pi)=>{ ch.getDatasetMeta(pi).hidden = (pi===i) ? manualHidden[pi] : true; });
+        ch.update("none");
+      });
+    });
+    item.addEventListener("mouseleave", applyHidden);
+    item.addEventListener("click", ()=>{
+      manualHidden[i] = !manualHidden[i];
+      item.style.opacity = manualHidden[i] ? ".4" : "1";
+      item.style.textDecoration = manualHidden[i] ? "line-through" : "none";
+      applyHidden();
+    });
+  });
+
   animateCardsIn(container);
   animateCounters(container);
 }
@@ -10081,6 +10331,30 @@ function renderBrandIntelBundleHTML(P){
       ${brandIntelTopPostsHTML(slices)}
     </div>`;
 }
+// Round 96: lean, standalone versions of the Trend/Media cards from the old bundle -- used
+// ONLY for many-brands x 1-platform (which keeps just these two pieces of the old bundle, per
+// explicit instruction), while renderBrandIntelBundleHTML/Charts stay completely unmodified and
+// keep firing in full for many-brands x many-platforms.
+function brandIntelTrendCardHTML(slices){
+  return `<div class="card brand-intel-chart-card" style="margin-bottom:16px">
+    <h3>Monthly Interactions Trend</h3>
+    <p class="sub" style="margin:-4px 0 12px">Interactions per month — trajectory matters more than totals</p>
+    <div class="brand-intel-grid">
+      <div class="chart-wrap" style="height:280px"><canvas id="brandIntelTrendChart"></canvas></div>
+      <div class="brand-intel-insights">${brandIntelTrendInsightsHTML(slices)}</div>
+    </div>
+  </div>`;
+}
+function brandIntelMediaCardHTML(slices, platformTitle){
+  return `<div class="card" style="margin-bottom:16px">
+    <h3>${esc(platformTitle)} Media Analysis</h3>
+    <p class="sub" style="margin:-4px 0 12px">Share of posts by media type — click a segment to see those posts</p>
+    <div class="brand-intel-grid">
+      <div>${brandIntelMediaBarsHTML(slices)}</div>
+      <div class="brand-intel-insights">${brandIntelMediaInsightsHTML(slices)}</div>
+    </div>
+  </div>`;
+}
 function renderBrandIntelBundleCharts(P){
   const platformSel = STATE.perfComparisonPlatform || "all";
   const slices = brandIntelSlices(P, platformSel);
@@ -10178,15 +10452,53 @@ function renderPerfComparison(){
   let html = `<div class="pagehead-row"><div class="pagehead"><h1>Comparison</h1><p>Head-to-head numbers for everything currently in view.</p></div>${exportBtnHTML("comparison")}</div>`;
   if(showScopeToggle) html += contentScopeToggleHTML("perfComparisonContentScope");
 
-  if(multiPlatform && !multiBrand){
-    html += `<div class="card" style="margin-bottom:16px"><h3>Platform leaderboard <span class="sub">by ${esc(metricLbl.toLowerCase())}</span></h3>
-      <div class="chart-wrap"><canvas id="perfLeaderboardChart"></canvas></div></div>`;
+  // Round 91: 1 brand x 1 platform genuinely has nothing to compare -- say so explicitly
+  // instead of leaving a bare header with no content below it, which used to look broken.
+  if(!multiBrand && !multiPlatform){
+    html += `<div class="card" style="text-align:center;padding:32px 20px">
+      <p style="font-weight:600;margin:0 0 6px">Nothing to compare here</p>
+      <p class="foot" style="margin:0">This report covers one brand on one platform. Add more brands or platforms to unlock comparisons.</p>
+    </div>`;
   }
 
-  if(multiBrand){
+  // Round 91: 1 brand x multi platform gets its own dedicated section (platform efficiency
+  // table, a metric-switchable ranking chart, best-post-per-platform, and a platform
+  // performance radar + heatmap) -- replaces the old bare leaderboard chart, which just
+  // duplicated the Content & Platforms section's own by-platform chart.
+  let perfPlatformMetricDefsForScope = null;
+  if(multiPlatform && !multiBrand){
+    perfPlatformMetricDefsForScope = perfPlatformMetricDefs(P);
+    html += renderPerfPlatformEfficiencySectionHTML(P, perfPlatformMetricDefsForScope);
+    // Round 96: same Monthly Trend / Media Analysis pieces many-brands x 1-platform keeps from
+    // the old bundle, added alongside the existing platform efficiency system above, keyed by
+    // platform. Order matches the brand scope: efficiency stuff first, then Trend, then Media
+    // (the Posts & Interactions combo chart is appended after everything, always last).
+    const platformSlices = platformIntelSlices(P);
+    html += perfPlatformIntelTrendCardHTML(platformSlices);
+    html += perfPlatformIntelMediaCardHTML(platformSlices);
+  }
+
+  // Round 96: many-brands x many-platforms keeps the full old bundle exactly as before. Many
+  // brands x 1 platform instead gets the round 95 efficiency system (table/ranking chart/mix
+  // chart/Top Engaged Posts/radar+heatmap) followed by just the Trend + Media pieces of the old
+  // bundle -- the old bundle's own table+insights card and its separate Top Engaged Posts card
+  // are dropped for this scope only, per explicit instruction (Top Engaged Posts now lives
+  // inside the round-95 section's own "Best post" slot, restyled -- see
+  // perfBestPostPerBrandSectionHTML). Order is unified with the 1-brand x multi-platform scope
+  // below: efficiency table -> ranking chart -> mix chart -> Top Engaged Posts -> radar+heatmap
+  // -> Monthly Trend -> Media Analysis -> the Posts & Interactions combo chart (always last).
+  let perfBrandMetricDefsForScope = null;
+  if(multiBrand && multiPlatform){
     html += renderBrandIntelBundleHTML(P);
   }
-  if(multiPlatform){
+  if(multiBrand && !multiPlatform){
+    perfBrandMetricDefsForScope = perfBrandMetricDefs(P);
+    html += renderPerfBrandEfficiencySectionHTML(P, perfBrandMetricDefsForScope);
+    const brandSlices = brandIntelSlices(P, "all");
+    html += brandIntelTrendCardHTML(brandSlices);
+    html += brandIntelMediaCardHTML(brandSlices, brandIntelPlatformTitle("all", P));
+  }
+  if(multiPlatform && multiBrand){
     const rows = sortRowsBy(P.byPlatform, "perfCompareSortPlatform", "engagement");
     const extraColsPlatform = isEng ? `${sortArrowTH("Saves","saves","perfCompareSortPlatform")}${sortArrowTH("Post clicks","post_clicks","perfCompareSortPlatform")}` : "";
     html += `<div class="card" style="margin-bottom:16px"><h3>By platform</h3><table class="datatable">
@@ -10211,14 +10523,1079 @@ function renderPerfComparison(){
   bindSortableHeaders($("view-perf-comparison"), renderPerfComparison);
   if(showScopeToggle) bindContentScopeToggles($("view-perf-comparison"), renderPerfComparison);
   if(multiBrand){ bindBrandIntelPlatformSelect(); bindBrandIntelMediaBarClicks(); }
+  if(multiPlatform && !multiBrand) bindPerfPlatformEfficiencySection(P, perfPlatformMetricDefsForScope);
+  if(multiBrand && !multiPlatform) bindPerfBrandEfficiencySection(P, perfBrandMetricDefsForScope);
+  if(multiPlatform && !multiBrand) bindPerfPlatformIntelMediaBarClicks();
 
   if(multiBrand) renderBrandIntelBundleCharts(P);
-  else if(multiPlatform) renderLeaderboardChart("perfLeaderboardChart","perfLeaderboard", P.byPlatform, "platform");
-  // "Posts & Total Interactions by brand" (2 stacked charts with a fixed shared date
+  if(multiPlatform && !multiBrand) renderPerfPlatformEfficiencyCharts(P, perfPlatformMetricDefsForScope);
+  if(multiBrand && !multiPlatform) renderPerfBrandEfficiencyCharts(P, perfBrandMetricDefsForScope);
+  if(multiPlatform && !multiBrand) renderPlatformIntelTrendChart(P);
+  // "Posts & Total Interactions by brand/platform" (2 stacked charts with a fixed shared date
   // axis) moved here from the Posting Timeline section per explicit request -- it's a
-  // brand-vs-brand comparison widget, so it belongs alongside the rest of this section's
-  // multi-brand breakdowns rather than under the single-series Posting Timeline chart.
+  // brand-vs-brand (or, for 1 brand x multi platform, platform-vs-platform) comparison widget,
+  // so it belongs alongside the rest of this section's own breakdowns rather than under the
+  // single-series Posting Timeline chart. Always appended last (insertAdjacentHTML("beforeend")
+  // inside each render function), matching the unified widget order for both scopes.
   if(multiBrand) renderPerfBrandCombo(P, STATE.perfFreqGranularity || "daily", "view-perf-comparison");
+  if(multiPlatform && !multiBrand) renderPerfPlatformCombo(P, STATE.perfFreqGranularity || "daily", "view-perf-comparison");
+}
+
+// ============================================================
+// Round 91: 1 brand x multi platform Comparison section (platform efficiency table +
+// metric-switchable ranking chart + best-post-per-platform + platform performance radar
+// with a heatmap). Every metric below is defined once here so the table, chart buttons,
+// best-post dropdown, radar series, and heatmap columns all agree on the same key/label/
+// value/format for a given metric -- and a metric whose total is 0 across every platform in
+// scope (e.g. Reach/Impressions/Video views for an export that doesn't carry that field, or
+// a public account API withholding it) is filtered out of ALL five widgets at once, per
+// explicit request, rather than needing a separate zero-check in each one.
+function perfPlatformMetricDefs(P){
+  const rows = P.byPlatform || [];
+  const label = engagementMetricLabel();
+  const totalPosts = rows.reduce((s,p)=>s+(p.posts||0),0);
+  const totalEngagement = rows.reduce((s,p)=>s+(p.engagement||0),0);
+  const totalReach = rows.reduce((s,p)=>s+(p.reach||0),0);
+  const totalImpressions = rows.reduce((s,p)=>s+(p.impressions||0),0);
+  const totalVideoViews = rows.reduce((s,p)=>s+(p.video_views||0),0);
+  const defs = [
+    { key:"posts", label:"Total posts", shortLabel:"Posts", isPct:false, available: totalPosts>0, value:(p)=>p.posts||0 },
+    { key:"engagement", label:perfTotalLabel(label), shortLabel:label, isPct:false, available: totalEngagement>0, value:(p)=>p.engagement||0 },
+    { key:"avgPerPost", label:"Avg. "+label.toLowerCase()+" per post", shortLabel:"Avg/post", isPct:false, available: totalPosts>0 && totalEngagement>0, value:(p)=> p.posts ? p.engagement/p.posts : 0 },
+    { key:"er", label:"Engagement rate", shortLabel:"ER%", isPct:true, available: totalReach>0, value:(p)=> p.reach ? p.engagement/p.reach*100 : 0 },
+    { key:"reach", label:"Reach", shortLabel:"Reach", isPct:false, available: totalReach>0, value:(p)=>p.reach||0 },
+    { key:"impressions", label:"Impressions", shortLabel:"Impr.", isPct:false, available: totalImpressions>0, value:(p)=>p.impressions||0 },
+    { key:"videoViews", label:"Video views", shortLabel:"Views", isPct:false, available: totalVideoViews>0, value:(p)=>p.video_views||0 }
+  ];
+  return defs.filter(d=>d.available);
+}
+// engagementMetricLabel() already returns "Total Interactions" in the default mode -- prefixing
+// that with another "Total " (as an earlier version of this file did) produced a literal
+// "Total Total Interactions" everywhere this label was used (table header, chart subtitle,
+// dropdown option, radar tooltip). Only prepend "Total " when the label doesn't already start
+// with it, so "Engagements" mode still reads "Total Engagements" but "Total Interactions" mode
+// isn't doubled.
+function perfTotalLabel(label){
+  return /^total\b/i.test(label) ? label : "Total "+label;
+}
+function perfPlatformMetricFmt(def, val){
+  if(val==null) return "N/A";
+  return def.isPct ? val.toFixed(1)+"%" : fmt(Math.round(val));
+}
+// Best content type per platform, ranked by engagement rate (engagement/reach) when this
+// platform's rows actually carry reach data, falling back to raw engagement when they don't
+// -- same reach-availability fallback logic as the metric defs above.
+function perfPlatformBestContentType(P){
+  const rows = P.rowsData || [];
+  const byPf = {};
+  rows.forEach(r=>{
+    const pf = r.platform || "Unknown";
+    const ct = r.content_type || "Unknown";
+    if(!byPf[pf]) byPf[pf] = {};
+    if(!byPf[pf][ct]) byPf[pf][ct] = { engagement:0, reach:0 };
+    byPf[pf][ct].engagement += engagementValueOf(r);
+    byPf[pf][ct].reach += Number(r.reach)||0;
+  });
+  const best = {};
+  Object.keys(byPf).forEach(pf=>{
+    const types = byPf[pf];
+    const hasReach = Object.values(types).some(t=>t.reach>0);
+    let bestType = null, bestScore = -1;
+    Object.keys(types).forEach(ct=>{
+      const t = types[ct];
+      const score = hasReach ? (t.reach ? t.engagement/t.reach*100 : -1) : t.engagement;
+      if(score>bestScore){ bestScore = score; bestType = ct; }
+    });
+    best[pf] = { type: bestType, byReach: hasReach };
+  });
+  return best;
+}
+function perfPlatformEfficiencyTableHTML(P, defs){
+  const label = engagementMetricLabel();
+  const bestContent = perfPlatformBestContentType(P);
+  const enriched = (P.byPlatform||[]).map(p=>{
+    const avg = p.posts ? p.engagement/p.posts : 0;
+    const er = p.reach ? p.engagement/p.reach*100 : null;
+    return Object.assign({}, p, { avgPerPost: avg, er: er });
+  });
+  const sort = STATE.perfPlatformEfficiencySort || {key:"engagement", dir:"desc"};
+  const rows = enriched.sort((a,b)=>{
+    if(sort.key==="platform"){
+      const av = String(a.platform||"").toLowerCase(), bv = String(b.platform||"").toLowerCase();
+      return sort.dir==="asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    // A platform with no reach data sorts as the lowest ER% (-1) rather than 0 -- otherwise
+    // it would rank ABOVE a platform with a genuine, if small, real ER% of 0.x%.
+    const av = sort.key==="er" ? (a.er==null?-1:a.er) : (Number(a[sort.key])||0);
+    const bv = sort.key==="er" ? (b.er==null?-1:b.er) : (Number(b[sort.key])||0);
+    return sort.dir==="asc" ? av-bv : bv-av;
+  });
+  const body = rows.map(p=>{
+    const bc = bestContent[p.platform];
+    return `<tr>
+      <td style="text-align:left">${platformIconHTML(p.platform)} ${esc(p.platform)}</td>
+      <td style="text-align:right;vertical-align:middle">${fmt(p.posts)}</td>
+      <td style="text-align:right;vertical-align:middle">${fmt(p.engagement)}</td>
+      <td style="text-align:right;vertical-align:middle">${fmt(Math.round(p.avgPerPost))}</td>
+      <td style="text-align:right;vertical-align:middle">${p.er!=null?p.er.toFixed(1)+"%":"N/A"}</td>
+      <td style="vertical-align:middle">${bc&&bc.type?esc(cap(bc.type)):"N/A"}${bc&&bc.type?`<div style="font-size:11px;color:var(--text-muted)">by ${bc.byReach?"ER%":label.toLowerCase()}</div>`:""}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px"><h3>Platform efficiency</h3><table class="datatable">
+    <thead><tr>${perfEfficiencySortTH("Platform","platform","left")}${perfEfficiencySortTH("Posts","posts","right")}${perfEfficiencySortTH(esc(perfTotalLabel(label)),"engagement","right")}${perfEfficiencySortTH("Avg/post","avgPerPost","right")}${perfEfficiencySortTH("Engagement rate","er","right")}<th>Best content type</th></tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`;
+}
+// Same shape as sortArrowTH() (same class/data attributes, so it plugs into the existing
+// generic bindSortableHeaders() handler with no new wiring), plus a column-alignment
+// parameter -- sortArrowTH itself has no alignment concept, and this table needs numeric
+// columns right-aligned while Platform stays left-aligned.
+function perfEfficiencySortTH(label, key, align){
+  const stateKey = "perfPlatformEfficiencySort";
+  const s = STATE[stateKey] || {key:"engagement", dir:"desc"};
+  const active = s.key===key;
+  const arrow = active ? (s.dir==="asc"?"▲":"▼") : "↕";
+  return `<th class="sortable-th" data-sort-key="${key}" data-sort-state="${stateKey}" style="text-align:${align};cursor:pointer;user-select:none;white-space:nowrap">${label} <span style="opacity:${active?1:.35};font-size:10px">${arrow}</span></th>`;
+}
+// Round 92: up to 3 metrics can be selected at once (grouped/clustered bars, one series per
+// metric) -- STATE now holds an ARRAY, not a single key. Always returns a valid 1-3 length
+// array: filters out any key that isn't in the currently-available defs (e.g. a metric that
+// was selected before but has since become unavailable), and falls back to a sane single
+// default (ER% if available) when nothing valid is selected.
+function perfPlatformChartMetrics(defs){
+  const availableKeys = defs.map(d=>d.key);
+  const saved = STATE.perfComparisonPlatformChartMetrics;
+  let sel = Array.isArray(saved) ? saved.filter(k=>availableKeys.includes(k)) : [];
+  if(!sel.length) sel = [ defs.some(d=>d.key==="er") ? "er" : (defs[0] ? defs[0].key : "engagement") ];
+  if(sel.length>3) sel = sel.slice(0,3);
+  return sel;
+}
+function perfPlatformChartSectionHTML(defs){
+  const selected = perfPlatformChartMetrics(defs);
+  const selDefs = selected.map(k=>defs.find(d=>d.key===k)).filter(Boolean);
+  const subtitleParts = selDefs.map(d=>d.label.toLowerCase());
+  const subtitle = subtitleParts.length>1
+    ? subtitleParts.slice(0,-1).join(", ")+" and "+subtitleParts[subtitleParts.length-1]
+    : subtitleParts[0];
+  // Once 3 metrics are selected, the other buttons are dimmed and disabled outright (rather
+  // than silently evicting the oldest pick on a 4th click) -- deselecting one re-enables the
+  // rest immediately, since `selected` is re-read fresh on every render.
+  const atCap = selected.length>=3;
+  const btns = defs.map(d=>{
+    const isSel = selected.includes(d.key);
+    const disabled = atCap && !isSel;
+    return `<button type="button" class="perf-metric-vbtn${isSel?" active":""}" data-metric-key="${esc(d.key)}"${disabled?" disabled":""}>${esc(d.shortLabel)}</button>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px"><h3>Platform ranking <span class="sub">by ${esc(subtitle)}</span></h3>
+    <p class="foot" style="margin:-4px 0 12px">Pick up to 3 metrics to compare side by side.</p>
+    <div class="perf-platform-chart-row">
+      <div class="chart-wrap" style="min-height:220px"><canvas id="perfPlatformMetricChart"></canvas></div>
+      <div class="perf-metric-vbtns" id="perfPlatformMetricBtns">${btns}</div>
+    </div>
+  </div>`;
+}
+// Round 94: "Platform mix" -- a 100%-stacked bar per platform. Unlike the ranking chart above
+// (which compares platforms against EACH OTHER on one metric at a time), this compares a
+// platform against ITSELF across 2+ metrics: how much of its own footprint leans toward posts
+// vs. engagement vs. reach, etc. Only the raw "volume" metrics make sense to stack this way --
+// avg/post and ER% are already ratios, not something you can add up into a whole, so those two
+// are excluded from this widget's own metric list even though they're in the shared `defs`.
+function perfPlatformMixDefs(defs){
+  const MIX_KEYS = ["posts","engagement","reach","impressions","videoViews"];
+  return defs.filter(d=>MIX_KEYS.includes(d.key));
+}
+// Always returns at least 2 keys (or as many as are even available, if fewer than 2 volume
+// metrics have any data at all) -- Posts is the default first pick per the spec, paired with
+// whichever other volume metric comes first in the list so the chart never starts with a
+// single, meaningless 100%-of-itself segment.
+function perfPlatformMixMetrics(mixDefs){
+  const availableKeys = mixDefs.map(d=>d.key);
+  const saved = STATE.perfComparisonPlatformMixMetrics;
+  let sel = Array.isArray(saved) ? saved.filter(k=>availableKeys.includes(k)) : [];
+  if(sel.length<2 && availableKeys.length>=2){
+    sel = availableKeys.includes("posts") ? ["posts"] : [];
+    for(const k of availableKeys){
+      if(sel.length>=2) break;
+      if(!sel.includes(k)) sel.push(k);
+    }
+  }
+  return sel;
+}
+function perfPlatformMixSectionHTML(mixDefs){
+  if(mixDefs.length<2) return "";
+  const selected = perfPlatformMixMetrics(mixDefs);
+  const selDefs = selected.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
+  const subtitleParts = selDefs.map(d=>d.label.toLowerCase());
+  const subtitle = subtitleParts.length>1
+    ? subtitleParts.slice(0,-1).join(", ")+" and "+subtitleParts[subtitleParts.length-1]
+    : subtitleParts[0];
+  const btns = mixDefs.map(d=>{
+    const isSel = selected.includes(d.key);
+    return `<button type="button" class="perf-metric-vbtn${isSel?" active":""}" data-metric-key="${esc(d.key)}">${esc(d.shortLabel)}</button>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px"><h3>Platform mix <span class="sub">${esc(subtitle)}</span></h3>
+    <p class="foot" style="margin:-4px 0 12px">Pick at least 2 metrics to see how each platform's activity splits between them.</p>
+    <div class="perf-platform-chart-row">
+      <div class="chart-wrap" style="min-height:220px"><canvas id="perfPlatformMixChart"></canvas></div>
+      <div class="perf-metric-vbtns" id="perfPlatformMixBtns">${btns}</div>
+    </div>
+  </div>`;
+}
+// Picks, per platform, the single post with the highest value of the selected metric --
+// "avg./post" has no distinct per-post meaning (a single post's own value IS its average),
+// so it deliberately reuses the same engagement value as "total"; every other metric reads
+// straight off that post's own row. Engagement rate is genuinely per-post here (that post's
+// own engagement/reach), not the platform aggregate used in the table above.
+function perfPostMetricValue(r, metricKey){
+  if(metricKey==="er") return r.reach>0 ? engagementValueOf(r)/r.reach*100 : null;
+  if(metricKey==="reach") return r.reach||0;
+  if(metricKey==="impressions") return r.impressions||0;
+  if(metricKey==="videoViews") return r.video_views||0;
+  return engagementValueOf(r);
+}
+function perfBestPostPerPlatform(P, metricKey){
+  const rows = P.rowsData || [];
+  const byPf = {};
+  rows.forEach(r=>{
+    const pf = r.platform || "Unknown";
+    const val = perfPostMetricValue(r, metricKey);
+    if(val==null) return;
+    if(!byPf[pf] || val>byPf[pf].__val) byPf[pf] = Object.assign({ __val: val }, r);
+  });
+  return byPf;
+}
+function perfMostRecentPostPerPlatform(P){
+  const rows = P.rowsData || [];
+  const byPf = {};
+  rows.forEach(r=>{
+    const pf = r.platform || "Unknown";
+    const t = new Date(r.date||0).getTime() || 0;
+    if(!byPf[pf] || t>=byPf[pf].__t) byPf[pf] = Object.assign({ __t:t, __val: engagementValueOf(r) }, r);
+  });
+  return byPf;
+}
+function perfBestPostMetric(defs){
+  const options = defs.filter(d=>d.key!=="posts");
+  const saved = STATE.perfComparisonBestPostMetric;
+  if(saved && options.some(d=>d.key===saved)) return saved;
+  return "engagement";
+}
+// Round 96: restyled from the compact "Best post per platform" card into the richer "Top
+// Engaged Posts" visual (mirrors perfBestPostPerBrandSectionHTML's own Round 96 restyle,
+// same stats grid + "Click to view" button) -- keeps this function's own name, STATE key, and
+// select id exactly as before, plus the metric dropdown and the existing 3-tier cascade.
+function perfBestPostPerPlatformSectionHTML(P, defs){
+  const options = defs.filter(d=>d.key!=="posts");
+  const selected = perfBestPostMetric(defs);
+  const selDef = options.find(d=>d.key===selected) || options[0];
+  const opts = options.map(d=>`<option value="${esc(d.key)}"${d.key===selDef.key?" selected":""}>${esc(d.label)}</option>`).join("");
+  const primaryPosts = perfBestPostPerPlatform(P, selDef.key);
+  // A platform can genuinely have posts but still have no entry above -- e.g. ranking "by ER%"
+  // when that platform's rows never report reach (Twitter/X and some YouTube exports commonly
+  // don't). Rather than show a bare "No posts." for a platform that DOES have data, fall back
+  // to ranking by the engagement metric (always computable whenever a post exists) and say so.
+  const fallbackPosts = selDef.key==="engagement" ? {} : perfBestPostPerPlatform(P, "engagement");
+  // Safety-net tier: whichever post is most recent for that platform, with no metric
+  // requirement at all. The "engagement" tier above already accepts every row (a value of 0
+  // still counts), so this should be structurally unreachable -- but it guarantees "No posts."
+  // is reserved for the one case where it's actually true: zero rows for that platform.
+  const anyPosts = perfMostRecentPostPerPlatform(P);
+  const hasAnyRows = {};
+  (P.rowsData||[]).forEach(r=>{ hasAnyRows[r.platform||"Unknown"] = true; });
+  const engLabel = engagementMetricLabel();
+  const cards = (P.platforms||[]).map(pf=>{
+    let post = primaryPosts[pf], usedFallback = false, usedAny = false;
+    if(!post && fallbackPosts[pf]){ post = fallbackPosts[pf]; usedFallback = true; }
+    if(!post && anyPosts[pf]){ post = anyPosts[pf]; usedAny = true; }
+    if(!post){
+      const msg = hasAnyRows[pf] ? `No posts with ${selDef.label.toLowerCase()} data.` : "No posts.";
+      return `<div class="brand-post-card"><div class="name">${platformIconHTML(pf)} ${esc(pf)}</div><div class="sub">${esc(msg)}</div></div>`;
+    }
+    const valDef = (usedFallback||usedAny) ? { isPct:false } : selDef;
+    const valLabel = (usedFallback||usedAny) ? engLabel : selDef.shortLabel;
+    const shareLabel = /^(x|twitter)$/i.test(pf||"") ? "Reposts" : "Shares";
+    const viewsVal = post.video_views>0 ? post.video_views : (post.impressions>0 ? post.impressions : post.reach);
+    const viewsLabel = post.video_views>0 ? "Views" : (post.impressions>0 ? "Impressions" : "Reach");
+    const captionText = String(post.caption||"(no caption)").slice(0,180);
+    const captionHTML = post.permalink
+      ? `<a href="${esc(post.permalink)}" target="_blank" rel="noopener">${esc(captionText)}</a>`
+      : esc(captionText);
+    const fallbackNote = usedFallback ? `<div class="sub" style="margin-top:4px">No ${esc(selDef.label.toLowerCase())} data -- showing top by ${esc(engLabel.toLowerCase())} instead.</div>`
+      : usedAny ? `<div class="sub" style="margin-top:4px">No ${esc(selDef.label.toLowerCase())} or ${esc(engLabel.toLowerCase())} data on any post -- showing the most recent post instead.</div>` : "";
+    return `<div class="brand-post-card">
+      <div class="name">${platformIconHTML(pf)} ${esc(pf)}</div>
+      <div class="perf-best-post-val" style="margin:2px 0 6px">${perfPlatformMetricFmt(valDef, post.__val)} ${esc(valLabel)}</div>
+      <div class="post-text" dir="auto">${captionHTML}</div>
+      <div class="stats">
+        <div class="s"><div class="n">${fmt(post.likes)}</div><div class="l">Likes</div></div>
+        <div class="s"><div class="n">${fmt(post.shares)}</div><div class="l">${esc(shareLabel)}</div></div>
+        <div class="s"><div class="n">${fmt(post.comments)}</div><div class="l">Comments</div></div>
+        <div class="s"><div class="n">${fmt(viewsVal)}</div><div class="l">${esc(viewsLabel)}</div></div>
+      </div>
+      ${fallbackNote}
+      ${post.permalink?`<a class="btn secondary" style="display:inline-block;font-size:12px;padding:6px 12px" href="${esc(post.permalink)}" target="_blank" rel="noopener">Click to view ↗</a>`:`<span class="sub">No link available</span>`}
+    </div>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+      <h3 style="margin:0">Top Engaged Posts</h3>
+      <select class="perf-metric-select" id="perfBestPostMetricSel">${opts}</select>
+    </div>
+    <div class="brand-post-cards">${cards||`<div class="foot">No posts in the current filter.</div>`}</div>
+  </div>`;
+}
+// 4 platform-POV insights for the radar below: the overall leader (averaged across every
+// metric's percentile rank), whether any platform leads in more than one metric outright,
+// the platform trailing the rest, and the single metric with the widest platform-to-platform
+// spread -- mirrors bigdRadarInsights' shape (always 4 emoji-prefixed strings) but told from
+// the platform's point of view instead of the day-of-week's.
+function perfPlatformRadarInsights(platforms, seriesByMetric, defs){
+  if(!platforms.length || !defs.length) return [];
+  const avgPct = platforms.map((pf,i)=>{
+    const vals = defs.map(d=>seriesByMetric[d.key][i]);
+    return vals.reduce((a,b)=>a+b,0)/vals.length;
+  });
+  let topIdx=0, leastIdx=0;
+  avgPct.forEach((v,i)=>{ if(v>avgPct[topIdx]) topIdx=i; if(v<avgPct[leastIdx]) leastIdx=i; });
+  const leadCounts = platforms.map(()=>0);
+  defs.forEach(d=>{
+    const vals = seriesByMetric[d.key];
+    let bestI=0; vals.forEach((v,i)=>{ if(v>vals[bestI]) bestI=i; });
+    leadCounts[bestI]++;
+  });
+  let standoutIdx=-1;
+  leadCounts.forEach((c,i)=>{ if(c>1 && (standoutIdx===-1 || c>leadCounts[standoutIdx])) standoutIdx=i; });
+  let maxGapDef=null, maxGap=-1, maxGapTopPf=null;
+  defs.forEach(d=>{
+    const vals = seriesByMetric[d.key];
+    const maxV = Math.max(...vals), minV = Math.min(...vals);
+    if(maxV-minV>maxGap){ maxGap = maxV-minV; maxGapDef = d; maxGapTopPf = platforms[vals.indexOf(maxV)]; }
+  });
+  const insights = [
+    `🏆 Top platform: ${esc(platforms[topIdx])} ranks highest overall, averaged across ${defs.length} metric${defs.length>1?"s":""} tracked here.`,
+    standoutIdx!==-1
+      ? `⭐ Multi-metric standout: ${esc(platforms[standoutIdx])} ranks #1 in ${leadCounts[standoutIdx]} of ${defs.length} metrics -- not just one.`
+      : `📊 Spread out: no single platform leads more than one metric here -- each has its own strength.`,
+    `📉 Room to grow: ${esc(platforms[leastIdx])} trails the rest across most metrics tracked here.`
+  ];
+  if(maxGapDef) insights.push(`↕️ Widest gap: ${esc(maxGapDef.label)} shows the biggest spread between platforms -- ${esc(maxGapTopPf)} is well ahead of the rest here.`);
+  return insights;
+}
+function perfPlatformMetricHeatmapHTML(P, defs){
+  const platforms = P.platforms||[];
+  const byPf = {};
+  (P.byPlatform||[]).forEach(p=>{ byPf[p.platform] = p; });
+  const max = {};
+  defs.forEach(d=>{ max[d.key] = Math.max(1, ...platforms.map(pf=> byPf[pf]?d.value(byPf[pf]):0)); });
+  const rows = platforms.map(pf=>{
+    const row = byPf[pf];
+    const cells = defs.map(d=>{
+      const v = row ? d.value(row) : 0;
+      const alpha = v ? Math.min(0.92, 0.14+0.78*(v/max[d.key])) : 0.06;
+      const textColor = alpha>0.45 ? "#fff" : "var(--text-muted)";
+      const display = v ? perfPlatformMetricFmt(d, v) : "";
+      return `<td><div class="bigd-heatmap-cell" style="background:rgba(6,182,212,${alpha});color:${textColor}" title="${esc(d.label)}: ${display||"0"}">${display}</div></td>`;
+    }).join("");
+    return `<tr><td class="hm-row-label" dir="auto">${esc(pf)}</td>${cells}</tr>`;
+  }).join("");
+  return `<div class="bigd-heatmap-wrap"><table class="bigd-heatmap-table"><thead><tr><th></th>${defs.map(d=>`<th>${esc(d.shortLabel)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function perfPlatformRadarSeriesByMetric(P, defs){
+  const platforms = P.platforms||[];
+  const byPf = {};
+  (P.byPlatform||[]).forEach(p=>{ byPf[p.platform] = p; });
+  const series = {};
+  defs.forEach(d=>{ series[d.key] = bigdPercentileRanks(platforms.map(pf=> byPf[pf]?d.value(byPf[pf]):0)); });
+  return series;
+}
+function perfPlatformRadarSectionHTML(P, defs){
+  const series = perfPlatformRadarSeriesByMetric(P, defs);
+  const insights = perfPlatformRadarInsights(P.platforms||[], series, defs);
+  return `<div class="bigd-pair-grid bigd-pair-grid-tall" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Platform performance radar</h3>
+      <div class="bigd-radar-split">
+        <div class="bigd-radar-insights"><ul class="bigd-radar-insights-list">${insights.map(t=>`<li>${t}</li>`).join("")}</ul></div>
+        <div class="bigd-radar-chart-col"><div class="chart-wrap" style="min-height:252px"><canvas id="perfPlatformRadarChart"></canvas></div></div>
+      </div>
+    </div>
+    <div class="card"><h3>All metrics <span class="sub">by platform</span></h3>${perfPlatformMetricHeatmapHTML(P, defs)}</div>
+  </div>`;
+}
+function renderPerfPlatformEfficiencySectionHTML(P, defs){
+  if(!defs.length) return "";
+  return perfPlatformEfficiencyTableHTML(P, defs)
+    + perfPlatformChartSectionHTML(defs)
+    + perfPlatformMixSectionHTML(perfPlatformMixDefs(defs))
+    + perfBestPostPerPlatformSectionHTML(P, defs)
+    + perfPlatformRadarSectionHTML(P, defs);
+}
+function bindPerfPlatformEfficiencySection(P, defs){
+  if(!defs || !defs.length) return;
+  qsa(".perf-metric-vbtn", $("perfPlatformMetricBtns")).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.metricKey;
+      let sel = perfPlatformChartMetrics(defs);
+      if(sel.includes(key)){
+        // Never allow deselecting down to 0 -- clicking the only active metric is a no-op.
+        if(sel.length>1) sel = sel.filter(k=>k!==key);
+      } else {
+        // Hard cap at 3: once 3 are selected, the other buttons render `disabled` (see
+        // perfPlatformChartSectionHTML) so this branch shouldn't normally fire for a 4th pick --
+        // this guard just keeps it a no-op rather than evicting anything if it ever does.
+        // Deselecting one immediately re-enables the rest, since the buttons re-render from
+        // `sel.length` on every call.
+        if(sel.length>=3) return;
+        sel = sel.concat([key]);
+      }
+      STATE.perfComparisonPlatformChartMetrics = sel;
+      renderPerfComparison();
+    });
+  });
+  const mixDefs = perfPlatformMixDefs(defs);
+  const mixBtnsEl = mixDefs.length>=2 ? $("perfPlatformMixBtns") : null;
+  if(mixBtnsEl){
+    qsa(".perf-metric-vbtn", mixBtnsEl).forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const key = btn.dataset.metricKey;
+        let sel = perfPlatformMixMetrics(mixDefs);
+        if(sel.includes(key)){
+          // Never allow deselecting below the required minimum of 2 -- a 1-segment "stack"
+          // isn't a mix of anything.
+          if(sel.length>2) sel = sel.filter(k=>k!==key);
+        } else {
+          sel = sel.concat([key]);
+        }
+        STATE.perfComparisonPlatformMixMetrics = sel;
+        renderPerfComparison();
+      });
+    });
+  }
+  const bpSel = $("perfBestPostMetricSel");
+  if(bpSel) bpSel.addEventListener("change", ()=>{
+    STATE.perfComparisonBestPostMetric = bpSel.value;
+    renderPerfComparison();
+  });
+}
+// One dataset per selected metric (1-3), grouped/clustered bars sharing the platform
+// categories on the x-axis, platforms sorted by the first (primary) selected metric. Each
+// metric gets its own y-scale so wildly different units (a raw count vs. a 0-100 percentage)
+// never get flattened onto one axis: the 1st is shown on the left, the 2nd on the right, and
+// a 3rd (when picked) gets a real scale for correct bar proportions but stays undisplayed --
+// a visible 3rd axis label with only 2 sides of the chart to put it on gets cluttered fast.
+const PERF_PLATFORM_METRIC_COLORS = { posts:"#8b5cf6", engagement:"#ec4899", avgPerPost:"#06b6d4", er:"#f59e0b", reach:"#3b82f6", impressions:"#10b981", videoViews:"#ef4444" };
+// Builds the "Platform mix" 100%-stacked bar: one bar per platform, segments = the selected
+// metrics. Segments are NOT raw values (posts counts and reach totals live on wildly different
+// scales, so summing them directly would make posts invisible) -- each metric is first turned
+// into a 0-100 percentile rank across platforms (the same transform the radar chart uses, via
+// bigdPercentileRanks), then those ranks are re-normalized per platform so ITS OWN stack always
+// sums to exactly 100%. A platform that's simply strong across every selected metric shows a
+// fairly even split; one that only stands out in a single metric shows a dominant segment.
+function renderPerfPlatformMixChart(P, mixDefs){
+  destroyChart("perfPlatformMix");
+  const chartEl = $("perfPlatformMixChart");
+  if(!chartEl || mixDefs.length<2) return;
+  const selectedKeys = perfPlatformMixMetrics(mixDefs);
+  const selDefs = selectedKeys.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
+  if(selDefs.length<2) return;
+  const platforms = P.platforms||[];
+  const byPf = {};
+  (P.byPlatform||[]).forEach(p=>{ byPf[p.platform] = p; });
+  const rankSeries = {};
+  selDefs.forEach(d=>{ rankSeries[d.key] = bigdPercentileRanks(platforms.map(pf=> byPf[pf]?d.value(byPf[pf]):0)); });
+  const shareSeries = {};
+  selDefs.forEach(d=> shareSeries[d.key] = []);
+  platforms.forEach((pf,i)=>{
+    const ranks = selDefs.map(d=>rankSeries[d.key][i]);
+    const sum = ranks.reduce((a,b)=>a+b,0);
+    // A platform that's dead last in every selected metric has a rank of 0 everywhere -- split
+    // its bar evenly rather than dividing by zero into a blank, invisible bar.
+    selDefs.forEach((d,di)=>{
+      const share = sum>0 ? (ranks[di]/sum*100) : (100/selDefs.length);
+      shareSeries[d.key].push(share);
+    });
+  });
+  const datasets = selDefs.map(d=>({
+    label: d.shortLabel,
+    data: shareSeries[d.key],
+    backgroundColor: PERF_PLATFORM_METRIC_COLORS[d.key] || "#3b82f6"
+  }));
+  charts.perfPlatformMix = new Chart(chartEl.getContext("2d"), {
+    type:"bar",
+    data:{ labels: platforms, datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:true, position:"bottom", labels:{boxWidth:10,font:{size:11}} },
+        tooltip:{ callbacks:{ label:(item)=>{
+          const d = selDefs[item.datasetIndex];
+          const row = byPf[platforms[item.dataIndex]];
+          const raw = row ? d.value(row) : 0;
+          return `${d.shortLabel}: ${item.parsed.y.toFixed(1)}% of mix (${perfPlatformMetricFmt(d, raw)})`;
+        } } }
+      },
+      scales:{
+        x:{ stacked:true },
+        y:{ stacked:true, min:0, max:100, ticks:{ callback:v=>v+"%" } }
+      }
+    }
+  });
+}
+function renderPerfPlatformEfficiencyCharts(P, defs){
+  if(!defs || !defs.length) return;
+  const selectedKeys = perfPlatformChartMetrics(defs);
+  const selDefs = selectedKeys.map(k=>defs.find(d=>d.key===k)).filter(Boolean);
+  destroyChart("perfPlatformMetric");
+  const chartEl = $("perfPlatformMetricChart");
+  if(chartEl && selDefs.length){
+    const primary = selDefs[0];
+    const rows = [...(P.byPlatform||[])].sort((a,b)=>primary.value(b)-primary.value(a));
+    const platformNames = rows.map(p=>p.platform);
+    const scaleIds = ["y","y1","y2"];
+    const datasets = selDefs.map((d,i)=>({
+      label: d.shortLabel,
+      data: rows.map(p=>d.value(p)),
+      backgroundColor: PERF_PLATFORM_METRIC_COLORS[d.key] || "#3b82f6",
+      yAxisID: scaleIds[i]
+    }));
+    const scales = { x:{} };
+    selDefs.forEach((d,i)=>{
+      scales[scaleIds[i]] = {
+        position: i===0 ? "left" : "right",
+        beginAtZero: true,
+        display: i<2,
+        grid: { drawOnChartArea: i===0 },
+        title: i<2 ? { display:true, text:d.shortLabel } : undefined,
+        ticks: { callback: v=> d.isPct? v+"%" : fmt(v) }
+      };
+    });
+    charts.perfPlatformMetric = new Chart(chartEl.getContext("2d"), {
+      type:"bar",
+      data:{ labels: platformNames, datasets },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display: selDefs.length>1, position:"bottom", labels:{boxWidth:10,font:{size:11}} } },
+        scales
+      },
+      plugins:[barValueLabelsPlugin]
+    });
+  }
+  renderPerfPlatformMixChart(P, perfPlatformMixDefs(defs));
+  destroyChart("perfPlatformRadar");
+  const radarEl = $("perfPlatformRadarChart");
+  if(radarEl){
+    const series = perfPlatformRadarSeriesByMetric(P, defs);
+    const palette = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4"];
+    const platforms = P.platforms||[];
+    const byPf = {};
+    (P.byPlatform||[]).forEach(p=>{ byPf[p.platform] = p; });
+    charts.perfPlatformRadar = new Chart(radarEl.getContext("2d"), {
+      type:"radar",
+      data:{ labels: platforms, datasets: defs.map((d,i)=>({
+        label: d.shortLabel, data: series[d.key],
+        borderColor: palette[i%palette.length], backgroundColor: palette[i%palette.length]+"33",
+        pointBackgroundColor: palette[i%palette.length], pointRadius:3, borderWidth:2
+      })) },
+      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:12},
+        plugins:{
+          legend:{position:"bottom", labels:{boxWidth:10,font:{size:11}}},
+          tooltip:{ callbacks:{ label:(item)=>{
+            const d = defs[item.datasetIndex];
+            const row = byPf[platforms[item.dataIndex]];
+            const raw = row ? d.value(row) : 0;
+            return `${d.shortLabel}: ${perfPlatformMetricFmt(d, raw)}`;
+          } } }
+        },
+        scales:{ r:{ min:0, max:100, ticks:{ stepSize:20, callback:v=>v+"%", backdropColor:"transparent", font:{size:9} }, pointLabels:{ font:{size:11,weight:"700"} } } }
+      }
+    });
+  }
+}
+
+// ============================================================
+// Round 95: many brands x 1 platform gets the SAME kind of comparison system built for 1 brand
+// x many platforms (Round 91-94) -- efficiency table, metric-switchable ranking chart, a mix
+// chart, best-post-per-brand, and a radar+heatmap -- just keyed by BRAND instead of PLATFORM.
+// Added ALONGSIDE the existing Brand Performance bundle (renderBrandIntelBundleHTML) per
+// explicit instruction, not replacing it, and scoped only to the Comparison section's many
+// brands x 1 platform case -- nothing else in the file is touched. perfPostMetricValue and
+// PERF_PLATFORM_METRIC_COLORS are reused as-is (already generic, row/metric-keyed, not
+// platform-specific despite their names); everything else below is a dedicated brand-keyed
+// mirror of its platform counterpart.
+// ============================================================
+function perfBrandMetricDefs(P){
+  const rows = P.byProfile || [];
+  const label = engagementMetricLabel();
+  const totalPosts = rows.reduce((s,p)=>s+(p.posts||0),0);
+  const totalEngagement = rows.reduce((s,p)=>s+(p.engagement||0),0);
+  const totalReach = rows.reduce((s,p)=>s+(p.reach||0),0);
+  const totalImpressions = rows.reduce((s,p)=>s+(p.impressions||0),0);
+  const totalVideoViews = rows.reduce((s,p)=>s+(p.video_views||0),0);
+  const defs = [
+    { key:"posts", label:"Total posts", shortLabel:"Posts", isPct:false, available: totalPosts>0, value:(p)=>p.posts||0 },
+    { key:"engagement", label:perfTotalLabel(label), shortLabel:label, isPct:false, available: totalEngagement>0, value:(p)=>p.engagement||0 },
+    { key:"avgPerPost", label:"Avg. "+label.toLowerCase()+" per post", shortLabel:"Avg/post", isPct:false, available: totalPosts>0 && totalEngagement>0, value:(p)=> p.posts ? p.engagement/p.posts : 0 },
+    { key:"er", label:"Engagement rate", shortLabel:"ER%", isPct:true, available: totalReach>0, value:(p)=> p.reach ? p.engagement/p.reach*100 : 0 },
+    { key:"reach", label:"Reach", shortLabel:"Reach", isPct:false, available: totalReach>0, value:(p)=>p.reach||0 },
+    { key:"impressions", label:"Impressions", shortLabel:"Impr.", isPct:false, available: totalImpressions>0, value:(p)=>p.impressions||0 },
+    { key:"videoViews", label:"Video views", shortLabel:"Views", isPct:false, available: totalVideoViews>0, value:(p)=>p.video_views||0 }
+  ];
+  return defs.filter(d=>d.available);
+}
+function perfBrandBestContentType(P){
+  const rows = P.rowsData || [];
+  const byP = {};
+  rows.forEach(r=>{
+    const p = r.profile || "Unknown";
+    const ct = r.content_type || "Unknown";
+    if(!byP[p]) byP[p] = {};
+    if(!byP[p][ct]) byP[p][ct] = { engagement:0, reach:0 };
+    byP[p][ct].engagement += engagementValueOf(r);
+    byP[p][ct].reach += Number(r.reach)||0;
+  });
+  const best = {};
+  Object.keys(byP).forEach(p=>{
+    const types = byP[p];
+    const hasReach = Object.values(types).some(t=>t.reach>0);
+    let bestType = null, bestScore = -1;
+    Object.keys(types).forEach(ct=>{
+      const t = types[ct];
+      const score = hasReach ? (t.reach ? t.engagement/t.reach*100 : -1) : t.engagement;
+      if(score>bestScore){ bestScore = score; bestType = ct; }
+    });
+    best[p] = { type: bestType, byReach: hasReach };
+  });
+  return best;
+}
+// Dedicated (not shared with perfEfficiencySortTH) so a click on this table's headers writes
+// to its own STATE.perfBrandEfficiencySort key -- never shares sort state with the platform
+// table's STATE.perfPlatformEfficiencySort, even though the two scopes never render at once.
+function perfBrandEfficiencySortTH(label, key, align){
+  const stateKey = "perfBrandEfficiencySort";
+  const s = STATE[stateKey] || {key:"engagement", dir:"desc"};
+  const active = s.key===key;
+  const arrow = active ? (s.dir==="asc"?"▲":"▼") : "↕";
+  return `<th class="sortable-th" data-sort-key="${key}" data-sort-state="${stateKey}" style="text-align:${align};cursor:pointer;user-select:none;white-space:nowrap">${label} <span style="opacity:${active?1:.35};font-size:10px">${arrow}</span></th>`;
+}
+function perfBrandEfficiencyTableHTML(P, defs){
+  const label = engagementMetricLabel();
+  const bestContent = perfBrandBestContentType(P);
+  const enriched = (P.byProfile||[]).map(p=>{
+    const avg = p.posts ? p.engagement/p.posts : 0;
+    const er = p.reach ? p.engagement/p.reach*100 : null;
+    return Object.assign({}, p, { avgPerPost: avg, er: er });
+  });
+  const sort = STATE.perfBrandEfficiencySort || {key:"engagement", dir:"desc"};
+  const rows = enriched.sort((a,b)=>{
+    if(sort.key==="profile"){
+      const av = String(a.profile||"").toLowerCase(), bv = String(b.profile||"").toLowerCase();
+      return sort.dir==="asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    const av = sort.key==="er" ? (a.er==null?-1:a.er) : (Number(a[sort.key])||0);
+    const bv = sort.key==="er" ? (b.er==null?-1:b.er) : (Number(b[sort.key])||0);
+    return sort.dir==="asc" ? av-bv : bv-av;
+  });
+  const body = rows.map(p=>{
+    const bc = bestContent[p.profile];
+    return `<tr>
+      <td style="text-align:left" dir="auto"><b>${esc(p.profile)}</b></td>
+      <td style="text-align:right;vertical-align:middle">${fmt(p.posts)}</td>
+      <td style="text-align:right;vertical-align:middle">${fmt(p.engagement)}</td>
+      <td style="text-align:right;vertical-align:middle">${fmt(Math.round(p.avgPerPost))}</td>
+      <td style="text-align:right;vertical-align:middle">${p.er!=null?p.er.toFixed(1)+"%":"N/A"}</td>
+      <td style="vertical-align:middle">${bc&&bc.type?esc(cap(bc.type)):"N/A"}${bc&&bc.type?`<div style="font-size:11px;color:var(--text-muted)">by ${bc.byReach?"ER%":label.toLowerCase()}</div>`:""}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px"><h3>Brand efficiency</h3><table class="datatable">
+    <thead><tr>${perfBrandEfficiencySortTH("Brand","profile","left")}${perfBrandEfficiencySortTH("Posts","posts","right")}${perfBrandEfficiencySortTH(esc(perfTotalLabel(label)),"engagement","right")}${perfBrandEfficiencySortTH("Avg/post","avgPerPost","right")}${perfBrandEfficiencySortTH("Engagement rate","er","right")}<th>Best content type</th></tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`;
+}
+function perfBrandChartMetrics(defs){
+  const availableKeys = defs.map(d=>d.key);
+  const saved = STATE.perfComparisonBrandChartMetrics;
+  let sel = Array.isArray(saved) ? saved.filter(k=>availableKeys.includes(k)) : [];
+  if(!sel.length) sel = [ defs.some(d=>d.key==="er") ? "er" : (defs[0] ? defs[0].key : "engagement") ];
+  if(sel.length>3) sel = sel.slice(0,3);
+  return sel;
+}
+function perfBrandChartSectionHTML(defs){
+  const selected = perfBrandChartMetrics(defs);
+  const selDefs = selected.map(k=>defs.find(d=>d.key===k)).filter(Boolean);
+  const subtitleParts = selDefs.map(d=>d.label.toLowerCase());
+  const subtitle = subtitleParts.length>1
+    ? subtitleParts.slice(0,-1).join(", ")+" and "+subtitleParts[subtitleParts.length-1]
+    : subtitleParts[0];
+  const atCap = selected.length>=3;
+  const btns = defs.map(d=>{
+    const isSel = selected.includes(d.key);
+    const disabled = atCap && !isSel;
+    return `<button type="button" class="perf-metric-vbtn${isSel?" active":""}" data-metric-key="${esc(d.key)}"${disabled?" disabled":""}>${esc(d.shortLabel)}</button>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px"><h3>Brand ranking <span class="sub">by ${esc(subtitle)}</span></h3>
+    <p class="foot" style="margin:-4px 0 12px">Pick up to 3 metrics to compare side by side.</p>
+    <div class="perf-platform-chart-row">
+      <div class="chart-wrap" style="min-height:220px"><canvas id="perfBrandMetricChart"></canvas></div>
+      <div class="perf-metric-vbtns" id="perfBrandMetricBtns">${btns}</div>
+    </div>
+  </div>`;
+}
+function perfBrandMixDefs(defs){
+  const MIX_KEYS = ["posts","engagement","reach","impressions","videoViews"];
+  return defs.filter(d=>MIX_KEYS.includes(d.key));
+}
+function perfBrandMixMetrics(mixDefs){
+  const availableKeys = mixDefs.map(d=>d.key);
+  const saved = STATE.perfComparisonBrandMixMetrics;
+  let sel = Array.isArray(saved) ? saved.filter(k=>availableKeys.includes(k)) : [];
+  if(sel.length<2 && availableKeys.length>=2){
+    sel = availableKeys.includes("posts") ? ["posts"] : [];
+    for(const k of availableKeys){
+      if(sel.length>=2) break;
+      if(!sel.includes(k)) sel.push(k);
+    }
+  }
+  return sel;
+}
+function perfBrandMixSectionHTML(mixDefs){
+  if(mixDefs.length<2) return "";
+  const selected = perfBrandMixMetrics(mixDefs);
+  const selDefs = selected.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
+  const subtitleParts = selDefs.map(d=>d.label.toLowerCase());
+  const subtitle = subtitleParts.length>1
+    ? subtitleParts.slice(0,-1).join(", ")+" and "+subtitleParts[subtitleParts.length-1]
+    : subtitleParts[0];
+  const btns = mixDefs.map(d=>{
+    const isSel = selected.includes(d.key);
+    return `<button type="button" class="perf-metric-vbtn${isSel?" active":""}" data-metric-key="${esc(d.key)}">${esc(d.shortLabel)}</button>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px"><h3>Brand mix <span class="sub">${esc(subtitle)}</span></h3>
+    <p class="foot" style="margin:-4px 0 12px">Pick at least 2 metrics to see how each brand's activity splits between them.</p>
+    <div class="perf-platform-chart-row">
+      <div class="chart-wrap" style="min-height:220px"><canvas id="perfBrandMixChart"></canvas></div>
+      <div class="perf-metric-vbtns" id="perfBrandMixBtns">${btns}</div>
+    </div>
+  </div>`;
+}
+function perfBestPostPerBrand(P, metricKey){
+  const rows = P.rowsData || [];
+  const byP = {};
+  rows.forEach(r=>{
+    const p = r.profile || "Unknown";
+    const val = perfPostMetricValue(r, metricKey);
+    if(val==null) return;
+    if(!byP[p] || val>byP[p].__val) byP[p] = Object.assign({ __val: val }, r);
+  });
+  return byP;
+}
+function perfMostRecentPostPerBrand(P){
+  const rows = P.rowsData || [];
+  const byP = {};
+  rows.forEach(r=>{
+    const p = r.profile || "Unknown";
+    const t = new Date(r.date||0).getTime() || 0;
+    if(!byP[p] || t>=byP[p].__t) byP[p] = Object.assign({ __t:t, __val: engagementValueOf(r) }, r);
+  });
+  return byP;
+}
+function perfBrandBestPostMetric(defs){
+  const options = defs.filter(d=>d.key!=="posts");
+  const saved = STATE.perfComparisonBrandBestPostMetric;
+  if(saved && options.some(d=>d.key===saved)) return saved;
+  return "engagement";
+}
+// Round 96: restyled from the compact "Best post per brand" card into the older, richer
+// "Top Engaged Posts" visual (full Likes/Shares/Comments/Views stats grid + "Click to view"
+// button, same as brandIntelTopPostsHTML's cards) -- but keeps this function's own name, STATE
+// key, and select id exactly as before, plus the metric dropdown and the 3-tier selection
+// cascade (primary metric -> engagement fallback -> most-recent-any-post safety net) --
+// brandIntelTopPostsHTML itself is untouched and still used, unmodified, by the full brand
+// bundle for many-brands x many-platforms.
+function perfBestPostPerBrandSectionHTML(P, defs){
+  const options = defs.filter(d=>d.key!=="posts");
+  const selected = perfBrandBestPostMetric(defs);
+  const selDef = options.find(d=>d.key===selected) || options[0];
+  const opts = options.map(d=>`<option value="${esc(d.key)}"${d.key===selDef.key?" selected":""}>${esc(d.label)}</option>`).join("");
+  const primaryPosts = perfBestPostPerBrand(P, selDef.key);
+  const fallbackPosts = selDef.key==="engagement" ? {} : perfBestPostPerBrand(P, "engagement");
+  const anyPosts = perfMostRecentPostPerBrand(P);
+  const hasAnyRows = {};
+  (P.rowsData||[]).forEach(r=>{ hasAnyRows[r.profile||"Unknown"] = true; });
+  const engLabel = engagementMetricLabel();
+  const cards = (P.profiles||[]).map(p=>{
+    let post = primaryPosts[p], usedFallback = false, usedAny = false;
+    if(!post && fallbackPosts[p]){ post = fallbackPosts[p]; usedFallback = true; }
+    if(!post && anyPosts[p]){ post = anyPosts[p]; usedAny = true; }
+    if(!post){
+      const msg = hasAnyRows[p] ? `No posts with ${selDef.label.toLowerCase()} data.` : "No posts.";
+      return `<div class="brand-post-card"><div class="name" dir="auto">${esc(p)}</div><div class="sub">${esc(msg)}</div></div>`;
+    }
+    const valDef = (usedFallback||usedAny) ? { isPct:false } : selDef;
+    const valLabel = (usedFallback||usedAny) ? engLabel : selDef.shortLabel;
+    const shareLabel = /^(x|twitter)$/i.test(post.platform||"") ? "Reposts" : "Shares";
+    const viewsVal = post.video_views>0 ? post.video_views : (post.impressions>0 ? post.impressions : post.reach);
+    const viewsLabel = post.video_views>0 ? "Views" : (post.impressions>0 ? "Impressions" : "Reach");
+    const captionText = String(post.caption||"(no caption)").slice(0,180);
+    const captionHTML = post.permalink
+      ? `<a href="${esc(post.permalink)}" target="_blank" rel="noopener">${esc(captionText)}</a>`
+      : esc(captionText);
+    const fallbackNote = usedFallback ? `<div class="sub" style="margin-top:4px">No ${esc(selDef.label.toLowerCase())} data -- showing top by ${esc(engLabel.toLowerCase())} instead.</div>`
+      : usedAny ? `<div class="sub" style="margin-top:4px">No ${esc(selDef.label.toLowerCase())} or ${esc(engLabel.toLowerCase())} data on any post -- showing the most recent post instead.</div>` : "";
+    return `<div class="brand-post-card">
+      <div class="name" dir="auto">${esc(p)}</div>
+      <div class="perf-best-post-val" style="margin:2px 0 6px">${perfPlatformMetricFmt(valDef, post.__val)} ${esc(valLabel)}</div>
+      <div class="post-text" dir="auto">${captionHTML}</div>
+      <div class="stats">
+        <div class="s"><div class="n">${fmt(post.likes)}</div><div class="l">Likes</div></div>
+        <div class="s"><div class="n">${fmt(post.shares)}</div><div class="l">${esc(shareLabel)}</div></div>
+        <div class="s"><div class="n">${fmt(post.comments)}</div><div class="l">Comments</div></div>
+        <div class="s"><div class="n">${fmt(viewsVal)}</div><div class="l">${esc(viewsLabel)}</div></div>
+      </div>
+      ${fallbackNote}
+      ${post.permalink?`<a class="btn secondary" style="display:inline-block;font-size:12px;padding:6px 12px" href="${esc(post.permalink)}" target="_blank" rel="noopener">Click to view ↗</a>`:`<span class="sub">No link available</span>`}
+    </div>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+      <h3 style="margin:0">Top Engaged Posts</h3>
+      <select class="perf-metric-select" id="perfBrandBestPostMetricSel">${opts}</select>
+    </div>
+    <div class="brand-post-cards">${cards||`<div class="foot">No posts in the current filter.</div>`}</div>
+  </div>`;
+}
+function perfBrandRadarInsights(brands, seriesByMetric, defs){
+  if(!brands.length || !defs.length) return [];
+  const avgPct = brands.map((p,i)=>{
+    const vals = defs.map(d=>seriesByMetric[d.key][i]);
+    return vals.reduce((a,b)=>a+b,0)/vals.length;
+  });
+  let topIdx=0, leastIdx=0;
+  avgPct.forEach((v,i)=>{ if(v>avgPct[topIdx]) topIdx=i; if(v<avgPct[leastIdx]) leastIdx=i; });
+  const leadCounts = brands.map(()=>0);
+  defs.forEach(d=>{
+    const vals = seriesByMetric[d.key];
+    let bestI=0; vals.forEach((v,i)=>{ if(v>vals[bestI]) bestI=i; });
+    leadCounts[bestI]++;
+  });
+  let standoutIdx=-1;
+  leadCounts.forEach((c,i)=>{ if(c>1 && (standoutIdx===-1 || c>leadCounts[standoutIdx])) standoutIdx=i; });
+  let maxGapDef=null, maxGap=-1, maxGapTopP=null;
+  defs.forEach(d=>{
+    const vals = seriesByMetric[d.key];
+    const maxV = Math.max(...vals), minV = Math.min(...vals);
+    if(maxV-minV>maxGap){ maxGap = maxV-minV; maxGapDef = d; maxGapTopP = brands[vals.indexOf(maxV)]; }
+  });
+  const insights = [
+    `🏆 Top brand: ${esc(brands[topIdx])} ranks highest overall, averaged across ${defs.length} metric${defs.length>1?"s":""} tracked here.`,
+    standoutIdx!==-1
+      ? `⭐ Multi-metric standout: ${esc(brands[standoutIdx])} ranks #1 in ${leadCounts[standoutIdx]} of ${defs.length} metrics -- not just one.`
+      : `📊 Spread out: no single brand leads more than one metric here -- each has its own strength.`,
+    `📉 Room to grow: ${esc(brands[leastIdx])} trails the rest across most metrics tracked here.`
+  ];
+  if(maxGapDef) insights.push(`↕️ Widest gap: ${esc(maxGapDef.label)} shows the biggest spread between brands -- ${esc(maxGapTopP)} is well ahead of the rest here.`);
+  return insights;
+}
+function perfBrandMetricHeatmapHTML(P, defs){
+  const brands = P.profiles||[];
+  const byP = {};
+  (P.byProfile||[]).forEach(p=>{ byP[p.profile] = p; });
+  const max = {};
+  defs.forEach(d=>{ max[d.key] = Math.max(1, ...brands.map(p=> byP[p]?d.value(byP[p]):0)); });
+  const rows = brands.map(p=>{
+    const row = byP[p];
+    const cells = defs.map(d=>{
+      const v = row ? d.value(row) : 0;
+      const alpha = v ? Math.min(0.92, 0.14+0.78*(v/max[d.key])) : 0.06;
+      const textColor = alpha>0.45 ? "#fff" : "var(--text-muted)";
+      const display = v ? perfPlatformMetricFmt(d, v) : "";
+      return `<td><div class="bigd-heatmap-cell" style="background:rgba(6,182,212,${alpha});color:${textColor}" title="${esc(d.label)}: ${display||"0"}">${display}</div></td>`;
+    }).join("");
+    return `<tr><td class="hm-row-label" dir="auto">${esc(p)}</td>${cells}</tr>`;
+  }).join("");
+  return `<div class="bigd-heatmap-wrap"><table class="bigd-heatmap-table"><thead><tr><th></th>${defs.map(d=>`<th>${esc(d.shortLabel)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function perfBrandRadarSeriesByMetric(P, defs){
+  const brands = P.profiles||[];
+  const byP = {};
+  (P.byProfile||[]).forEach(p=>{ byP[p.profile] = p; });
+  const series = {};
+  defs.forEach(d=>{ series[d.key] = bigdPercentileRanks(brands.map(p=> byP[p]?d.value(byP[p]):0)); });
+  return series;
+}
+function perfBrandRadarSectionHTML(P, defs){
+  const series = perfBrandRadarSeriesByMetric(P, defs);
+  const insights = perfBrandRadarInsights(P.profiles||[], series, defs);
+  return `<div class="bigd-pair-grid bigd-pair-grid-tall" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Brand performance radar</h3>
+      <div class="bigd-radar-split">
+        <div class="bigd-radar-insights"><ul class="bigd-radar-insights-list">${insights.map(t=>`<li>${t}</li>`).join("")}</ul></div>
+        <div class="bigd-radar-chart-col"><div class="chart-wrap" style="min-height:252px"><canvas id="perfBrandRadarChart"></canvas></div></div>
+      </div>
+    </div>
+    <div class="card"><h3>All metrics <span class="sub">by brand</span></h3>${perfBrandMetricHeatmapHTML(P, defs)}</div>
+  </div>`;
+}
+function renderPerfBrandEfficiencySectionHTML(P, defs){
+  if(!defs.length) return "";
+  return perfBrandEfficiencyTableHTML(P, defs)
+    + perfBrandChartSectionHTML(defs)
+    + perfBrandMixSectionHTML(perfBrandMixDefs(defs))
+    + perfBestPostPerBrandSectionHTML(P, defs)
+    + perfBrandRadarSectionHTML(P, defs);
+}
+function bindPerfBrandEfficiencySection(P, defs){
+  if(!defs || !defs.length) return;
+  qsa(".perf-metric-vbtn", $("perfBrandMetricBtns")).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.metricKey;
+      let sel = perfBrandChartMetrics(defs);
+      if(sel.includes(key)){
+        if(sel.length>1) sel = sel.filter(k=>k!==key);
+      } else {
+        if(sel.length>=3) return;
+        sel = sel.concat([key]);
+      }
+      STATE.perfComparisonBrandChartMetrics = sel;
+      renderPerfComparison();
+    });
+  });
+  const mixDefs = perfBrandMixDefs(defs);
+  const mixBtnsEl = mixDefs.length>=2 ? $("perfBrandMixBtns") : null;
+  if(mixBtnsEl){
+    qsa(".perf-metric-vbtn", mixBtnsEl).forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const key = btn.dataset.metricKey;
+        let sel = perfBrandMixMetrics(mixDefs);
+        if(sel.includes(key)){
+          if(sel.length>2) sel = sel.filter(k=>k!==key);
+        } else {
+          sel = sel.concat([key]);
+        }
+        STATE.perfComparisonBrandMixMetrics = sel;
+        renderPerfComparison();
+      });
+    });
+  }
+  const bpSel = $("perfBrandBestPostMetricSel");
+  if(bpSel) bpSel.addEventListener("change", ()=>{
+    STATE.perfComparisonBrandBestPostMetric = bpSel.value;
+    renderPerfComparison();
+  });
+}
+function renderPerfBrandMixChart(P, mixDefs){
+  destroyChart("perfBrandMix");
+  const chartEl = $("perfBrandMixChart");
+  if(!chartEl || mixDefs.length<2) return;
+  const selectedKeys = perfBrandMixMetrics(mixDefs);
+  const selDefs = selectedKeys.map(k=>mixDefs.find(d=>d.key===k)).filter(Boolean);
+  if(selDefs.length<2) return;
+  const brands = P.profiles||[];
+  const byP = {};
+  (P.byProfile||[]).forEach(p=>{ byP[p.profile] = p; });
+  const rankSeries = {};
+  selDefs.forEach(d=>{ rankSeries[d.key] = bigdPercentileRanks(brands.map(p=> byP[p]?d.value(byP[p]):0)); });
+  const shareSeries = {};
+  selDefs.forEach(d=> shareSeries[d.key] = []);
+  brands.forEach((p,i)=>{
+    const ranks = selDefs.map(d=>rankSeries[d.key][i]);
+    const sum = ranks.reduce((a,b)=>a+b,0);
+    selDefs.forEach((d,di)=>{
+      const share = sum>0 ? (ranks[di]/sum*100) : (100/selDefs.length);
+      shareSeries[d.key].push(share);
+    });
+  });
+  const datasets = selDefs.map(d=>({
+    label: d.shortLabel,
+    data: shareSeries[d.key],
+    backgroundColor: PERF_PLATFORM_METRIC_COLORS[d.key] || "#3b82f6"
+  }));
+  charts.perfBrandMix = new Chart(chartEl.getContext("2d"), {
+    type:"bar",
+    data:{ labels: brands, datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:true, position:"bottom", labels:{boxWidth:10,font:{size:11}} },
+        tooltip:{ callbacks:{ label:(item)=>{
+          const d = selDefs[item.datasetIndex];
+          const row = byP[brands[item.dataIndex]];
+          const raw = row ? d.value(row) : 0;
+          return `${d.shortLabel}: ${item.parsed.y.toFixed(1)}% of mix (${perfPlatformMetricFmt(d, raw)})`;
+        } } }
+      },
+      scales:{
+        x:{ stacked:true },
+        y:{ stacked:true, min:0, max:100, ticks:{ callback:v=>v+"%" } }
+      }
+    }
+  });
+}
+function renderPerfBrandEfficiencyCharts(P, defs){
+  if(!defs || !defs.length) return;
+  const selectedKeys = perfBrandChartMetrics(defs);
+  const selDefs = selectedKeys.map(k=>defs.find(d=>d.key===k)).filter(Boolean);
+  destroyChart("perfBrandMetric");
+  const chartEl = $("perfBrandMetricChart");
+  if(chartEl && selDefs.length){
+    const primary = selDefs[0];
+    const rows = [...(P.byProfile||[])].sort((a,b)=>primary.value(b)-primary.value(a));
+    const brandNames = rows.map(p=>p.profile);
+    const scaleIds = ["y","y1","y2"];
+    const datasets = selDefs.map((d,i)=>({
+      label: d.shortLabel,
+      data: rows.map(p=>d.value(p)),
+      backgroundColor: PERF_PLATFORM_METRIC_COLORS[d.key] || "#3b82f6",
+      yAxisID: scaleIds[i]
+    }));
+    const scales = { x:{} };
+    selDefs.forEach((d,i)=>{
+      scales[scaleIds[i]] = {
+        position: i===0 ? "left" : "right",
+        beginAtZero: true,
+        display: i<2,
+        grid: { drawOnChartArea: i===0 },
+        title: i<2 ? { display:true, text:d.shortLabel } : undefined,
+        ticks: { callback: v=> d.isPct? v+"%" : fmt(v) }
+      };
+    });
+    charts.perfBrandMetric = new Chart(chartEl.getContext("2d"), {
+      type:"bar",
+      data:{ labels: brandNames, datasets },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display: selDefs.length>1, position:"bottom", labels:{boxWidth:10,font:{size:11}} } },
+        scales
+      },
+      plugins:[barValueLabelsPlugin]
+    });
+  }
+  renderPerfBrandMixChart(P, perfBrandMixDefs(defs));
+  destroyChart("perfBrandRadar");
+  const radarEl = $("perfBrandRadarChart");
+  if(radarEl){
+    const series = perfBrandRadarSeriesByMetric(P, defs);
+    const palette = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4"];
+    const brands = P.profiles||[];
+    const byP = {};
+    (P.byProfile||[]).forEach(p=>{ byP[p.profile] = p; });
+    charts.perfBrandRadar = new Chart(radarEl.getContext("2d"), {
+      type:"radar",
+      data:{ labels: brands, datasets: defs.map((d,i)=>({
+        label: d.shortLabel, data: series[d.key],
+        borderColor: palette[i%palette.length], backgroundColor: palette[i%palette.length]+"33",
+        pointBackgroundColor: palette[i%palette.length], pointRadius:3, borderWidth:2
+      })) },
+      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:12},
+        plugins:{
+          legend:{position:"bottom", labels:{boxWidth:10,font:{size:11}}},
+          tooltip:{ callbacks:{ label:(item)=>{
+            const d = defs[item.datasetIndex];
+            const row = byP[brands[item.dataIndex]];
+            const raw = row ? d.value(row) : 0;
+            return `${d.shortLabel}: ${perfPlatformMetricFmt(d, raw)}`;
+          } } }
+        },
+        scales:{ r:{ min:0, max:100, ticks:{ stepSize:20, callback:v=>v+"%", backdropColor:"transparent", font:{size:9} }, pointLabels:{ font:{size:11,weight:"700"} } } }
+      }
+    });
+  }
 }
 
 function exportComparisonSection(config){
@@ -10541,8 +11918,10 @@ function renderPlatformPostPreview(post){
 // it always was for the main dashboard's Post Performance widget.
 function postDetailBodyHTML(post){
   const engagement = post.engagement||0;
-  const impEngRate = post.engagement_rate!=null ? post.engagement_rate
-    : (post.impressions>0 ? (engagement/post.impressions*100) : null);
+  // ER is standardized to reach only across the whole app (Comparison section and here) --
+  // do not fall back to the raw imported engagement_rate column, since its basis (reach vs.
+  // impressions) varies by which export column matched and can't be trusted to agree with this.
+  const engRate = post.reach>0 ? (engagement/post.reach*100) : null;
   const repostShare = engagement>0 ? (post.shares/engagement*100) : null;
   const isEngDetail = engagementMetricMode()==="engagements";
 
@@ -10569,7 +11948,7 @@ function postDetailBodyHTML(post){
     </div>
 
     <div class="pd-row"><span class="k">${esc(engagementMetricLabel())}</span><span class="v">${fmt(engagement)}</span></div>
-    <div class="pd-row"><span class="k">Impressions engagement rate</span><span class="v">${impEngRate!=null?impEngRate.toFixed(2)+"%":"— (no impressions reported)"}</span></div>
+    <div class="pd-row"><span class="k">Engagement rate</span><span class="v">${engRate!=null?engRate.toFixed(2)+"%":"— (no reach reported)"}</span></div>
     <div class="pd-row"><span class="k">Reposts % of ${esc(engagementMetricLabel().toLowerCase())}</span><span class="v">${repostShare!=null?repostShare.toFixed(1)+"%":"—"}</span></div>
 
     ${post.permalink ? `<button class="btn accent" style="width:100%;margin-top:18px" onclick="window.open('${esc(post.permalink)}','_blank','noopener')">View original post ↗</button>`
