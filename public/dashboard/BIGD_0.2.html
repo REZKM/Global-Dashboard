@@ -1882,6 +1882,31 @@ body.mode-performance #performanceRoot .grid-kpi .card.kpi .widget-head-row .lab
 .brand-media-bar{display:flex;height:26px;border-radius:6px;overflow:hidden;background:var(--neutral-soft);}
 .brand-media-legend{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text-muted);}
 .brand-media-legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle;}
+/* Round 101: Multi-Brand x Multi-Platform Comparison matrix -- a plain table (not a CSS
+   grid, unlike the Benchmarking View's column rows) so it gets native two-axis scrolling for
+   free: min-width per column plus one scrolling wrapper handles "too many platforms" the
+   same way "too many brands" is handled -- scroll, don't break -- without needing round
+   100's grid-auto-columns trick, which only existed to force overflow onto an otherwise
+   auto-sizing CSS grid. Sticky header row + sticky first column keep the brand names and
+   platform headers in view while scrolling either axis. */
+.bp-matrix-scroll{overflow:auto;max-height:440px;border-radius:10px;}
+.bp-matrix-table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;}
+.bp-matrix-table th,.bp-matrix-table td{padding:0;}
+.bp-matrix-table thead th{position:sticky;top:0;background:var(--card-bg);z-index:2;padding:8px 6px 12px;font-weight:700;}
+.bp-matrix-corner{position:sticky;left:0;top:0;z-index:3;background:var(--card-bg);}
+.bp-matrix-table tbody th,.bp-matrix-table tfoot th{position:sticky;left:0;background:var(--card-bg);z-index:1;text-align:left;padding:8px 12px 8px 4px;border-right:1px solid var(--card-border);font-weight:700;font-size:12.5px;}
+.bp-matrix-table tfoot th{background:var(--neutral-soft);border-top:2px solid var(--card-border);}
+.bp-matrix-table tfoot td{border-top:2px solid var(--card-border);}
+.bp-platform-col-head{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:100px;font-size:10.5px;font-weight:700;color:var(--text-muted);}
+.bp-matrix-cell{padding:5px !important;}
+.bp-matrix-cell-inner{border-radius:9px;padding:8px 6px;text-align:center;min-height:50px;display:flex;flex-direction:column;justify-content:center;}
+.bp-matrix-cell-value{font-size:12.5px;font-weight:800;}
+.bp-matrix-cell-sub{font-size:9px;font-weight:700;margin-top:2px;opacity:.75;}
+.bp-matrix-cell-empty{color:var(--text-muted);font-weight:700;font-size:12px;background:var(--neutral-soft);}
+.bp-matrix-total-col,.bp-matrix-total-cell{background:var(--neutral-soft) !important;font-weight:800;}
+.bp-matrix-scope-note{font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:10px;}
+.bp-matrix-scale-legend{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--text-muted);font-weight:700;margin-top:10px;}
+.bp-matrix-scale-bar{width:110px;height:8px;border-radius:4px;}
 .brand-post-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;}
 .brand-post-card{border:1px solid var(--card-border);border-radius:10px;padding:14px;background:var(--card-bg);}
 .brand-post-card .name{font-weight:700;margin-bottom:12px;font-size:13.5px;}
@@ -10636,6 +10661,328 @@ function brandPlatformBreakdownRowsHTML(P, isEng, colCount){
   });
   return out;
 }
+// ============================================================
+// Round 101: Multi-Brand x Multi-Platform Comparison -- the many-brands x many-platforms
+// scope already keeps the full "old bundle" (renderBrandIntelBundleHTML), the "By platform"
+// table, and the "Brand x platform breakdown" flat table exactly as before (see
+// renderPerfComparison() below) -- this section REPLACES the old fixed 2-heatmap grid that
+// used to close out that scope with a fuller, purpose-built 2D comparison: a metric-
+// switchable matrix (scrolls both axes rather than breaking at scale, same "scroll, don't
+// truncate" principle as round 99/100), a per-brand platform-mix breakdown (reusing the
+// existing .brand-media-row/-bar/-seg/-legend visual from the Platform/Brand mix widgets,
+// just iterated per BRAND instead of per metric), a grouped bar chart, a real Media
+// Analysis widget (benchmarkMediaTableHTML() and the exact bmMedia_ combo-chart recipe,
+// reused verbatim), and a cross-brand/platform Top Posts table (P.topPosts, already
+// correctly scoped/sorted, just given Brand+Platform columns). Every number below reads
+// from the SAME P (aggregatePerformanceRows() output) every other section on this page
+// already uses -- own layout/aggregation-shape logic suited to a 2D matrix, not a
+// parallel data pipeline.
+function perfMatrixLookup(P){
+  const lookup = {};
+  (P.byProfilePlatform||[]).forEach(row=>{
+    lookup[row.profile] = lookup[row.profile] || {};
+    lookup[row.profile][row.platform] = row;
+  });
+  return lookup;
+}
+// perfPlatformMetricDefs() already returns an availability-filtered metric list (posts/
+// engagement/avgPerPost/er/reach/impressions/videoViews) whose value(row) functions only
+// assume a posts/engagement/reach/impressions/video_views-shaped row -- true of
+// byProfilePlatform cells, byProfile row-totals, and byPlatform column-totals alike -- so
+// the exact same defs (labels, formatting, zero-filtering) work unchanged here instead of a
+// second, parallel metric-definition list.
+function perfMatrixMetricDefs(P){ return perfPlatformMetricDefs(P); }
+function perfMatrixActiveMetricKey(defs){
+  const saved = STATE.perfMatrixMetric;
+  if(saved && defs.some(d=>d.key===saved)) return saved;
+  return defs.length ? defs[0].key : "engagement";
+}
+function perfMatrixMetricSelectHTML(defs){
+  const active = perfMatrixActiveMetricKey(defs);
+  const cellMode = STATE.perfMatrixCellMode || "raw";
+  return `<div class="benchmark-pill-select-wrap" style="min-width:170px;margin-right:8px">
+    <select id="perfMatrixMetricSelect">${defs.map(d=>`<option value="${esc(d.key)}"${d.key===active?" selected":""}>${esc(d.shortLabel)}</option>`).join("")}</select>
+  </div>
+  <div class="benchmark-pill-select-wrap" style="min-width:170px">
+    <select id="perfMatrixCellModeSelect">
+      <option value="raw"${cellMode==="raw"?" selected":""}>Raw value</option>
+      <option value="rowpct"${cellMode==="rowpct"?" selected":""}>% of brand total</option>
+      <option value="colpct"${cellMode==="colpct"?" selected":""}>% of platform total</option>
+    </select>
+  </div>`;
+}
+function bigdHeatColor(pct, accentHex){
+  const m = String(accentHex||"#07B782").match(/^#?(..)(..)(..)$/);
+  const rgb = m ? m.slice(1).map(h=>parseInt(h,16)).join(",") : "7,183,130";
+  const alpha = Math.round((0.08 + Math.max(0,Math.min(1,pct))*0.72)*100)/100;
+  return { css:`rgba(${rgb},${alpha})`, rgb };
+}
+function perfMatrixKpiOverviewHTML(P){
+  const totals = P.totals || {};
+  const byProfile = P.byProfile || [];
+  const byPlatform = P.byPlatform || [];
+  const avgER = totals.reach ? Math.round(totals.engagement/totals.reach*1000)/10 : 0;
+  const leadingBrand = byProfile.reduce((best,p)=> (!best || (p.engagement||0)>(best.engagement||0)) ? p : best, null);
+  const leadingPlatform = byPlatform.reduce((best,p)=> (!best || (p.engagement||0)>(best.engagement||0)) ? p : best, null);
+  const engLower = engagementMetricLabel().toLowerCase();
+  const items = [
+    { ovColor:"#06b6d4", label:"Matrix coverage", value:`${(P.profiles||[]).length} × ${(P.platforms||[]).length}`, sub:"brands × platforms in view" },
+    { ovColor:"#8b5cf6", label:"Total posts", value:fmt(totals.posts), sub:"across the whole matrix" },
+    { ovColor:"#ec4899", label:`Total ${esc(engLower)}`, value:fmt(totals.engagement), sub:"across the whole matrix" },
+    { ovColor:"#3b82f6", label:"Total reach", value:fmt(totals.reach), sub:"across the whole matrix" },
+    { ovColor:"#f59e0b", label:"Avg. engagement rate", value:avgER+"%", sub:"engagement ÷ reach, blended" },
+    { ovColor:"#07B782", label:"Leading brand", value: leadingBrand?esc(leadingBrand.profile):"—", sub: leadingBrand?`${fmt(leadingBrand.engagement)} ${esc(engLower)}`:"" },
+    { ovColor:"#EA580C", label:"Leading platform", value: leadingPlatform?esc(cap(leadingPlatform.platform)):"—", sub: leadingPlatform?`${fmt(leadingPlatform.engagement)} ${esc(engLower)}`:"" },
+  ];
+  const blocks = items.map(it=> renderStandardWidget({
+    wrapperClass:"ov-metric", ovColor: it.ovColor,
+    title:`<span class="ov-metric-label">${esc(it.label)}</span>`,
+    value:`<span class="ov-metric-value" dir="auto">${it.value}</span>`,
+    subtitleHtml:`<span class="ov-metric-sub">${esc(it.sub)}</span>`
+  })).join("");
+  return benchmarkSectionTitleHTML("Brand × platform overview", "", "Totals and standout pairings across the full matrix currently in view")
+    + `<div class="overview-summary-card"><div class="overview-summary-grid">${blocks}</div></div>`
+    + perfMatrixInsightsHTML(P);
+}
+function perfMatrixInsightsHTML(P){
+  const lookup = perfMatrixLookup(P);
+  const brands = P.profiles||[], platforms = P.platforms||[];
+  const lines = [];
+  let best=null;
+  brands.forEach(b=> platforms.forEach(pf=>{
+    const c = lookup[b] && lookup[b][pf]; if(!c || !c.reach) return;
+    const er = c.engagement/c.reach*100;
+    if(!best || er>best.er) best = {b, pf, er};
+  }));
+  if(best) lines.push(`<b>${esc(best.b)}</b> on <b>${esc(cap(best.pf))}</b> is the strongest single pairing in view — a ${Math.round(best.er*10)/10}% engagement rate, the highest of any brand-platform cell currently shown.`);
+  let widest=null;
+  brands.forEach(b=>{ const n = platforms.filter(pf=> lookup[b]&&lookup[b][pf]).length; if(!widest||n>widest.n) widest={b,n}; });
+  if(widest && widest.n>0) lines.push(`<b>${esc(widest.b)}</b> has the broadest footprint in this view, active on ${widest.n} of the ${platforms.length} platforms compared.`);
+  let thinnest=null;
+  platforms.forEach(pf=>{ const n = brands.filter(b=> lookup[b]&&lookup[b][pf]).length; if(!thinnest||n<thinnest.n) thinnest={pf,n}; });
+  if(thinnest) lines.push(`<b>${esc(cap(thinnest.pf))}</b> has the thinnest coverage — only ${thinnest.n} of ${brands.length} brands post there, worth flagging as a gap or a deliberate focus depending on strategy.`);
+  const list = brandIntelInsightsWrapHTML(lines);
+  if(!list) return "";
+  return `<div class="card" style="margin-bottom:16px"><h3>Key takeaways</h3>${list}</div>`;
+}
+function perfMatrixHeatmapTableHTML(P, defs){
+  const metricKey = perfMatrixActiveMetricKey(defs);
+  const def = defs.find(d=>d.key===metricKey) || defs[0];
+  if(!def) return `<div class="foot">No metric data available to compare.</div>`;
+  const lookup = perfMatrixLookup(P);
+  const byProfileLookup = {}; (P.byProfile||[]).forEach(r=> byProfileLookup[r.profile]=r);
+  const byPlatformLookup = {}; (P.byPlatform||[]).forEach(r=> byPlatformLookup[r.platform]=r);
+  const cellMode = STATE.perfMatrixCellMode || "raw";
+  const brands = P.profiles||[], platforms = P.platforms||[];
+
+  let vmin=Infinity, vmax=-Infinity;
+  brands.forEach(b=> platforms.forEach(pf=>{
+    const c = lookup[b] && lookup[b][pf]; if(!c) return;
+    const v = def.value(c);
+    if(v<vmin) vmin=v; if(v>vmax) vmax=v;
+  }));
+  if(!isFinite(vmin)){ vmin=0; vmax=1; }
+  const heat0 = bigdHeatColor(0, STATE.client.accent);
+
+  const head = `<thead><tr>
+    <th class="bp-matrix-corner"></th>
+    ${platforms.map(pf=>`<th><div class="bp-platform-col-head">${platformIconHTML(pf)}<span>${esc(cap(pf))}</span></div></th>`).join("")}
+    <th class="bp-matrix-total-col">Total</th>
+  </tr></thead>`;
+
+  const bodyRows = brands.map(b=>{
+    const cells = platforms.map(pf=>{
+      const c = lookup[b] && lookup[b][pf];
+      if(!c) return `<td class="bp-matrix-cell"><div class="bp-matrix-cell-inner bp-matrix-cell-empty">—</div></td>`;
+      const v = def.value(c);
+      const pct = vmax>vmin ? (v-vmin)/(vmax-vmin) : (vmax>0?1:0);
+      let sub = "";
+      if(cellMode==="rowpct"){ const rt = def.value(byProfileLookup[b]||{}); sub = rt ? Math.round(v/rt*100)+"% of brand" : ""; }
+      if(cellMode==="colpct"){ const ct = def.value(byPlatformLookup[pf]||{}); sub = ct ? Math.round(v/ct*100)+"% of platform" : ""; }
+      const heat = bigdHeatColor(pct, STATE.client.accent);
+      return `<td class="bp-matrix-cell"><div class="bp-matrix-cell-inner" style="background:${heat.css};color:${pct>0.55?'#fff':'inherit'}"><span class="bp-matrix-cell-value">${perfPlatformMetricFmt(def, v)}</span>${sub?`<span class="bp-matrix-cell-sub">${esc(sub)}</span>`:""}</div></td>`;
+    }).join("");
+    const rowTotal = def.value(byProfileLookup[b]||{});
+    return `<tr>
+      <th dir="auto">${esc(b)}</th>
+      ${cells}
+      <td class="bp-matrix-cell bp-matrix-total-col"><div class="bp-matrix-cell-inner bp-matrix-total-cell"><span class="bp-matrix-cell-value">${perfPlatformMetricFmt(def, rowTotal)}</span></div></td>
+    </tr>`;
+  }).join("");
+
+  const footCells = platforms.map(pf=>{
+    const v = def.value(byPlatformLookup[pf]||{});
+    return `<td class="bp-matrix-cell"><div class="bp-matrix-cell-inner bp-matrix-total-cell"><span class="bp-matrix-cell-value">${perfPlatformMetricFmt(def, v)}</span></div></td>`;
+  }).join("");
+  const grand = def.value(P.totals||{});
+  const foot = `<tfoot><tr>
+    <th>Total</th>${footCells}
+    <td class="bp-matrix-cell bp-matrix-total-col"><div class="bp-matrix-cell-inner bp-matrix-total-cell"><span class="bp-matrix-cell-value">${perfPlatformMetricFmt(def, grand)}</span></div></td>
+  </tr></tfoot>`;
+
+  const scopeNote = platforms.length>5
+    ? `${brands.length} brands × ${platforms.length} platforms — scroll to see every column and row`
+    : `${brands.length} brands × ${platforms.length} platforms`;
+
+  return `<div class="bp-matrix-scope-note">${esc(scopeNote)}</div>
+    <div class="bp-matrix-scroll"><table class="bp-matrix-table">${head}<tbody>${bodyRows}</tbody>${foot}</table></div>
+    <div class="bp-matrix-scale-legend"><span>Low</span><span class="bp-matrix-scale-bar" style="background:linear-gradient(90deg, ${heat0.css}, rgba(${heat0.rgb},.9))"></span><span>High</span></div>`;
+}
+function perfMatrixHeatmapSectionHTML(P, defs){
+  const metricKey = perfMatrixActiveMetricKey(defs);
+  const def = defs.find(d=>d.key===metricKey) || defs[0];
+  return benchmarkSectionTitleHTML(
+    "Brand × platform matrix",
+    perfMatrixMetricSelectHTML(defs),
+    `Darker = higher ${esc(def?def.shortLabel.toLowerCase():"value")}`
+  ) + `<div class="card" style="margin-bottom:16px">${perfMatrixHeatmapTableHTML(P, defs)}</div>`;
+}
+function perfMatrixMixSectionHTML(P, defs){
+  const metricKey = perfMatrixActiveMetricKey(defs);
+  const def = defs.find(d=>d.key===metricKey) || defs[0];
+  const lookup = perfMatrixLookup(P);
+  const brands = P.profiles||[], platforms = P.platforms||[];
+  const platColorMap = entityColorMap(platforms, "platform");
+  const rows = brands.map(b=>{
+    const raws = platforms.map(pf=>{ const c=lookup[b]&&lookup[b][pf]; return c ? Math.max(0, def.value(c)) : 0; });
+    const total = raws.reduce((a,v)=>a+v,0);
+    const segs = platforms.map((pf,i)=>{
+      const share = total>0 ? raws[i]/total*100 : 0;
+      if(share<=0) return "";
+      const shareR = Math.round(share*10)/10;
+      return `<div class="brand-media-seg" style="flex:${share};background:${esc(platColorMap[pf])};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:2px" title="${esc(cap(pf))}: ${shareR}%">${shareR>=10?shareR+"%":""}</div>`;
+    }).join("");
+    return `<div class="brand-media-row"><div class="name" dir="auto">${esc(b)}</div><div class="brand-media-bar">${total>0?segs:`<div class="brand-media-seg" style="flex:1;background:var(--neutral-soft)"></div>`}</div></div>`;
+  }).join("");
+  const legend = platforms.map(pf=>`<span><span class="sw" style="background:${esc(platColorMap[pf])}"></span>${esc(cap(pf))}</span>`).join("");
+  return benchmarkSectionTitleHTML("Platform mix per brand", "", `Each brand's own ${esc(def?def.shortLabel.toLowerCase():"value")} split across its platforms — 100% per row`)
+    + `<div class="card" style="margin-bottom:16px">${rows}<div class="brand-media-legend">${legend}</div></div>`;
+}
+function perfMatrixChartSectionHTML(defs){
+  const metricKey = perfMatrixActiveMetricKey(defs);
+  const def = defs.find(d=>d.key===metricKey) || defs[0];
+  return benchmarkSectionTitleHTML(`${esc(def?def.shortLabel:"Metric")} — brand vs. platform`, "", "One bar per platform, grouped by brand — exact numbers behind the matrix's color-coding above")
+    + `<div class="card" style="margin-bottom:16px"><div class="chart-wrap" style="height:320px"><canvas id="perfMatrixChart"></canvas></div><div class="pie-legend-row" id="perfMatrixChartLegend"></div></div>`;
+}
+function perfMatrixMediaSectionHTML(P){
+  return benchmarkSectionTitleHTML("Media type breakdown", "", `Posts, ${esc(engagementMetricLabel().toLowerCase())} and avg/post by media type — across every brand and platform currently in view`)
+    + `<div class="card" style="margin-bottom:16px">
+      <div class="chart-wrap" style="height:240px"><canvas id="perfMatrixMediaChart"></canvas></div>
+      <div class="pie-legend-row bigd-combo-legend" id="perfMatrixMediaLegend"></div>
+      ${benchmarkMediaTableHTML(P)}
+    </div>`;
+}
+function perfMatrixPostsSectionHTML(P){
+  const shown = STATE.perfMatrixPostsShown || 10;
+  const sorted = sortRowsBy(P.topPosts||[], "perfMatrixPostsSort", "engagement");
+  const rows = sorted.slice(0, shown);
+  const head = `<tr>
+    <th>Post</th>
+    ${sortArrowTH("Brand","profile","perfMatrixPostsSort")}
+    ${sortArrowTH("Platform","platform","perfMatrixPostsSort")}
+    ${sortArrowTH("Likes","likes","perfMatrixPostsSort")}
+    ${sortArrowTH("Comments","comments","perfMatrixPostsSort")}
+    ${sortArrowTH("Shares","shares","perfMatrixPostsSort")}
+    ${sortArrowTH(engagementMetricLabel(),"engagement","perfMatrixPostsSort")}
+  </tr>`;
+  const body = rows.map(p=>`<tr>
+    <td dir="auto" style="max-width:280px">${p.permalink?`<a class="mtext" target="_blank" rel="noopener" href="${esc(p.permalink)}">${esc(String(p.caption||"(no caption)").slice(0,90))}</a>`:esc(String(p.caption||"(no caption)").slice(0,90))}</td>
+    <td dir="auto">${esc(p.profile)}</td>
+    <td>${platformIconHTML(p.platform)} ${esc(cap(p.platform))}</td>
+    <td>${fmt(p.likes)}</td><td>${fmt(p.comments)}</td><td>${fmt(p.shares)}</td><td><b>${fmt(p.engagement)}</b></td>
+  </tr>`).join("") || `<tr><td colspan="7" style="color:var(--text-muted)">No posts for the current brand/platform selection.</td></tr>`;
+  return benchmarkSectionTitleHTML("Top cross-performing posts", "", "Across every brand and platform currently in view — click a column to sort")
+    + `<div class="card">
+      <table class="datatable"><thead>${head}</thead><tbody>${body}</tbody></table>
+      <div class="footerbar">
+        <span>Showing ${Math.min(rows.length, sorted.length)} of ${fmt(sorted.length)}</span>
+        ${rows.length<sorted.length?`<button class="btn secondary" id="perfMatrixPostsLoadMore">Load more</button>`:""}
+      </div>
+    </div>`;
+}
+function renderPerfMatrixSectionHTML(P){
+  const defs = perfMatrixMetricDefs(P);
+  if(!defs.length) return "";
+  return perfMatrixKpiOverviewHTML(P)
+    + perfMatrixHeatmapSectionHTML(P, defs)
+    + perfMatrixMixSectionHTML(P, defs)
+    + perfMatrixChartSectionHTML(defs)
+    + perfMatrixMediaSectionHTML(P)
+    + perfMatrixPostsSectionHTML(P);
+}
+function bindPerfMatrixSection(){
+  const metricSel = $("perfMatrixMetricSelect");
+  if(metricSel) metricSel.addEventListener("change", ()=>{ STATE.perfMatrixMetric = metricSel.value; renderPerfComparison(); });
+  const cellModeSel = $("perfMatrixCellModeSelect");
+  if(cellModeSel) cellModeSel.addEventListener("change", ()=>{ STATE.perfMatrixCellMode = cellModeSel.value; renderPerfComparison(); });
+  const loadMoreBtn = $("perfMatrixPostsLoadMore");
+  if(loadMoreBtn) loadMoreBtn.addEventListener("click", ()=>{ STATE.perfMatrixPostsShown = (STATE.perfMatrixPostsShown||10)+10; renderPerfComparison(); });
+}
+function renderPerfMatrixGroupedChart(P, defs){
+  const canvas = $("perfMatrixChart");
+  if(!canvas) return;
+  const metricKey = perfMatrixActiveMetricKey(defs);
+  const def = defs.find(d=>d.key===metricKey) || defs[0];
+  if(!def) return;
+  const lookup = perfMatrixLookup(P);
+  const brands = P.profiles||[], platforms = P.platforms||[];
+  const datasets = platforms.map(pf=>{
+    const style = platformBrandStyle(pf);
+    return {
+      label: cap(pf),
+      data: brands.map(b=>{ const c = lookup[b]&&lookup[b][pf]; return c ? def.value(c) : 0; }),
+      backgroundColor: style.bg, borderRadius:4, maxBarThickness:26
+    };
+  });
+  destroyChart("perfMatrixChart");
+  charts["perfMatrixChart"] = new Chart(canvas.getContext("2d"), {
+    type:"bar",
+    data:{ labels: brands, datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=> `${ctx.dataset.label}: ${perfPlatformMetricFmt(def, ctx.parsed.y)}` } } },
+      scales:{ x:{grid:{display:false}}, y:{ ticks:{ callback:(v)=> perfPlatformMetricFmt(def, v) } } }
+    }
+  });
+  const legendEl = $("perfMatrixChartLegend");
+  if(legendEl) legendEl.innerHTML = platforms.map(pf=>`<div class="pie-legend-item"><div class="pie-legend-label"><span class="pie-legend-dot" style="background:${esc(platformBrandStyle(pf).bg)}"></span>${esc(cap(pf))}</div></div>`).join("");
+}
+function renderPerfMatrixMediaChart(P){
+  const el = $("perfMatrixMediaChart");
+  destroyChart("perfMatrixMediaChart");
+  if(!el) return;
+  const mtKeys = Array.from(new Set([...Object.keys(P.mediaType||{}), ...Object.keys(P.mediaTypeInteractions||{})]));
+  if(!mtKeys.length) return;
+  const mtEntries = mtKeys.map(k=>{
+    const mposts = (P.mediaType||{})[k]||0;
+    const minteractions = (P.mediaTypeInteractions||{})[k]||0;
+    return { key:k, posts:mposts, interactions:minteractions, avgPerPost: mposts ? minteractions/mposts : 0 };
+  }).sort((a,b)=>b.posts-a.posts);
+  const mediaDatasets = [
+    {type:"bar", label:"Posts", data:mtEntries.map(e=>e.posts), backgroundColor: BIGD_METRIC_COLOR.posts, yAxisID:"y", order:3},
+    {type:"bar", label:engagementMetricLabel(), data:mtEntries.map(e=>e.interactions), backgroundColor: BIGD_METRIC_COLOR.engagement, yAxisID:"y1", order:2},
+    {type:"line", label:"Avg "+engagementMetricLabel().toLowerCase()+"/post", data:mtEntries.map(e=>Math.round(e.avgPerPost*10)/10), borderColor:"#f59e0b", backgroundColor:"#f59e0b", fill:false, borderWidth:1.5, tension:.3, pointRadius:2, yAxisID:"y2", order:1}
+  ];
+  charts["perfMatrixMediaChart"] = new Chart(el.getContext("2d"), {
+    data:{ labels: mtEntries.map(e=>cap(e.key)), datasets: mediaDatasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{position:"left", beginAtZero:true, title:{display:true,text:"Posts"}, ticks:{callback:v=>fmt(v)}},
+        y1:{position:"right", beginAtZero:true, title:{display:true,text:engagementMetricLabel()}, grid:{drawOnChartArea:false}, ticks:{callback:v=>fmt(v)}},
+        y2:{display:false, beginAtZero:true}
+      } },
+    plugins:[lineValueLabelsPlugin]
+  });
+  const legendEl = $("perfMatrixMediaLegend");
+  if(legendEl) legendEl.innerHTML = bigdComboLegendHTML(mediaDatasets);
+}
+function renderPerfMatrixCharts(P){
+  const defs = perfMatrixMetricDefs(P);
+  if(!defs.length) return;
+  renderPerfMatrixGroupedChart(P, defs);
+  renderPerfMatrixMediaChart(P);
+}
+
 function renderPerfComparison(){
   if(!$("view-perf-comparison")) return;
   const base = getActivePerformanceView();
@@ -10703,17 +11050,16 @@ function renderPerfComparison(){
     </table></div>`;
   }
   if(multiBrand && multiPlatform){
-    const lookup = {};
-    P.byProfilePlatform.forEach(p=>{ lookup[p.profile] = lookup[p.profile]||{}; lookup[p.profile][p.platform] = p; });
     const colCount = 2 + (isEng ? 8 : 6);
     html += `<div class="card" style="margin-bottom:16px"><h3>Brand × platform breakdown</h3><table class="datatable">
       <thead><tr><th>Brand</th><th>Platform</th><th>Posts</th><th>Likes</th><th>Comments</th><th>Shares</th>${isEng?"<th>Saves</th><th>Post clicks</th>":""}<th>${esc(metricLbl)}</th><th>Reach</th></tr></thead>
       <tbody>${brandPlatformBreakdownRowsHTML(P, isEng, colCount)}</tbody>
-    </table></div>
-    <div class="grid grid-2">
-      <div class="card"><h3>By brand × platform — posts</h3>${heatmapTableHTML(P.profiles, P.platforms, lookup, "posts", STATE.client.accent)}</div>
-      <div class="card"><h3>By brand × platform — ${esc(metricLbl.toLowerCase())}</h3>${heatmapTableHTML(P.profiles, P.platforms, lookup, "engagement", STATE.client.accent)}</div>
-    </div>`;
+    </table></div>`;
+    // Round 101: Multi-Brand x Multi-Platform Comparison -- replaces the old fixed 2-heatmap
+    // grid that used to close out this scope (see renderPerfMatrixSectionHTML's own comment
+    // for what it adds: KPI overview + insights, a switchable matrix, platform mix per
+    // brand, a grouped chart, Media Analysis, and a cross-brand/platform Top Posts table).
+    html += renderPerfMatrixSectionHTML(P);
   }
   $("view-perf-comparison").innerHTML = html;
   bindSortableHeaders($("view-perf-comparison"), renderPerfComparison);
@@ -10722,11 +11068,13 @@ function renderPerfComparison(){
   if(multiPlatform && !multiBrand) bindPerfPlatformEfficiencySection(P, perfPlatformMetricDefsForScope);
   if(multiBrand && !multiPlatform) bindPerfBrandEfficiencySection(P, perfBrandMetricDefsForScope);
   if(multiPlatform && !multiBrand) bindPerfPlatformIntelMediaBarClicks();
+  if(multiBrand && multiPlatform) bindPerfMatrixSection();
 
   if(multiBrand) renderBrandIntelBundleCharts(P);
   if(multiPlatform && !multiBrand) renderPerfPlatformEfficiencyCharts(P, perfPlatformMetricDefsForScope);
   if(multiBrand && !multiPlatform) renderPerfBrandEfficiencyCharts(P, perfBrandMetricDefsForScope);
   if(multiPlatform && !multiBrand) renderPlatformIntelTrendChart(P);
+  if(multiBrand && multiPlatform) renderPerfMatrixCharts(P);
   // "Posts & Total Interactions by brand/platform" (2 stacked charts with a fixed shared date
   // axis) moved here from the Posting Timeline section per explicit request -- it's a
   // brand-vs-brand (or, for 1 brand x multi platform, platform-vs-platform) comparison widget,
