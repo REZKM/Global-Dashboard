@@ -967,6 +967,13 @@ table.datatable a.mtext{color:var(--text);}
 .wiz-card span{color:var(--text-muted);font-size:12.5px;}
 .wiz-card:hover{border-color:var(--accent);}
 .wiz-card.selected{border-width:2px;border-color:var(--accent-dark);background:#cdf1e4;}
+/* Round 124: Listening Branch stays visible but reads as unavailable -- dimmed, no hover
+   highlight, "not-allowed" cursor. Still a real, clickable button (see
+   bindWizardStepEvents()) so clicking it can show the "under development" message; only
+   its look is disabled here, not its click handling. */
+.wiz-card.wiz-card-disabled{opacity:.55;cursor:not-allowed;}
+.wiz-card.wiz-card-disabled:hover{border-color:var(--card-border);}
+.wiz-card.wiz-card-disabled i{color:var(--text-muted);font-style:italic;}
 
 .wiz-chip-col{display:flex;flex-direction:column;gap:8px;}
 .chip{background:var(--neutral-soft);border:1.5px solid transparent;padding:10px 14px;border-radius:9px;font-size:13px;font-weight:600;color:var(--text);text-align:left;}
@@ -15963,7 +15970,7 @@ function stepHTML_type(){
   return `<h2>What do you want to build?</h2>
   <p class="wiz-sub">Choose the dashboard branch.</p>
   <div class="wiz-choice-row">
-    <button class="wiz-card ${WZ.branch==='listening'?'selected':''}" data-branch="listening"><b>Listening</b><span>What is the public saying about us?</span></button>
+    <button class="wiz-card wiz-card-disabled ${WZ.branch==='listening'?'selected':''}" data-branch="listening" aria-disabled="true" title="Listening Branch is under development"><b>Listening</b><span>What is the public saying about us? <i>(Under development)</i></span></button>
     <button class="wiz-card ${WZ.branch==='performance'?'selected':''}" data-branch="performance"><b>Performance</b><span>How did our own content perform?</span></button>
   </div>`;
 }
@@ -16856,7 +16863,17 @@ async function handleWizardPerformanceExport(file){
 
 function bindWizardStepEvents(stepId){
   if(stepId==="type"){
-    qsa(".wiz-card[data-branch]").forEach(c=>c.addEventListener("click", ()=>{ WZ.branch = c.dataset.branch; WZ.perfMode = null; WZ.step=0; renderWizard(); }));
+    // Round 124: the Listening Branch is under development -- kept visible (dimmed via
+    // .wiz-card-disabled, see stepHTML_type()) rather than hidden entirely, but clicking it
+    // must not select it or navigate anywhere; it just tells the user why nothing happened.
+    // Performance's own click behavior (and every other wizard step) is completely untouched.
+    qsa(".wiz-card[data-branch]").forEach(c=>c.addEventListener("click", ()=>{
+      if(c.dataset.branch==="listening"){
+        toast("Listening Branch is under development \u2014 this option isn't available yet.");
+        return;
+      }
+      WZ.branch = c.dataset.branch; WZ.perfMode = null; WZ.step=0; renderWizard();
+    }));
   }
   else if(stepId==="perfMode"){
     qsa(".wiz-card[data-perfmode]").forEach(c=>c.addEventListener("click", ()=>{ WZ.perfMode = c.dataset.perfmode; renderWizard(); }));
