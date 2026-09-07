@@ -519,6 +519,35 @@ section.view.blurred{filter:blur(5px);opacity:.45;pointer-events:none;user-selec
 .intel-post-text{font-size:13px;line-height:1.5;color:#e8ecf5;}
 .intel-post-stats{display:flex;gap:14px;font-size:11px;color:#9fb0d0;margin-top:8px;flex-wrap:wrap;}
 .intel-footnote{font-size:11px;color:#8794ad;border-top:1px solid rgba(255,255,255,0.14);padding-top:16px;margin-top:6px;line-height:1.6;}
+/* Round 111: Executive Intelligence findings UI (dark panel theme, matching the existing
+   .intel-* palette above). */
+.intel-empty-note{font-size:12.5px;color:#9fb0d0;}
+.intel-exec-summary ul{margin:0;padding-left:20px;}
+.intel-exec-summary li{margin-bottom:8px;font-size:13.5px;line-height:1.5;color:#e8ecf5;}
+.intel-finding-card{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);border-radius:14px;padding:18px 20px;margin-bottom:16px;}
+.intel-finding-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.intel-finding-head h3{margin:0;font-size:14px;font-weight:800;color:#fff;line-height:1.4;}
+.intel-finding-badge{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:999px;flex-shrink:0;background:rgba(59,130,246,0.25);color:#8fc8ff;}
+.intel-finding-badge.risk{background:rgba(239,68,68,0.25);color:#ffb4b4;}
+.intel-finding-explanation{font-size:13px;line-height:1.6;color:#cfd6e6;margin:0 0 12px;}
+.intel-finding-metrics{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.intel-finding-metric{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:8px 12px;min-width:100px;}
+.intel-finding-metric .v{font-size:16px;font-weight:800;color:#fff;}
+.intel-finding-metric .l{font-size:9.5px;color:#9fb0d0;text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+.intel-finding-evidence-title{font-size:10.5px;font-weight:800;color:#9fb0d0;text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px;}
+.intel-evidence-list{margin:0 0 12px;padding-left:18px;}
+.intel-evidence-list li{font-size:12px;line-height:1.6;color:#b8c4dc;margin-bottom:4px;}
+.intel-finding-implication{font-size:12.5px;line-height:1.6;color:#dfe6f2;margin:0 0 8px;}
+.intel-finding-implication b{color:#fff;}
+.intel-finding-recommendation{font-size:12.5px;line-height:1.6;color:#bfe6cf;margin:0 0 4px;}
+.intel-finding-recommendation b{color:#fff;}
+.intel-recommendation-card{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:12px;padding:12px 16px;margin-bottom:10px;font-size:12.5px;line-height:1.6;color:#dfe6f2;}
+.intel-recommendation-card b{color:#8ee6ab;}
+.intel-watchout-card{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:12px 16px;margin-bottom:10px;font-size:12.5px;line-height:1.6;color:#dfe6f2;}
+.intel-watchout-card b{color:#ffb4b4;}
+.intel-driver-posts{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);}
+.intel-driver-posts-title{font-size:10.5px;font-weight:800;color:#9fb0d0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+
 
 .ms-dropdown{position:relative;}
 .ms-summary{
@@ -601,6 +630,21 @@ table.datatable a.mtext{color:var(--text);}
 .pill-toggle{display:inline-flex;background:var(--neutral-soft);border-radius:8px;padding:2px;}
 .pill-toggle button{background:transparent;border:none;padding:5px 12px;font-size:11.5px;font-weight:600;border-radius:6px;color:var(--text-muted);}
 .pill-toggle button.active{background:var(--card-bg);color:var(--text);box-shadow:var(--shadow);}
+/* Round 115: compact variant of .pill-toggle for the unified ERF/ER%/ERi KPI card -- sits
+   beside the card's own title inside its already-tight ~32-34px widget-head-row, so it
+   needs a smaller footprint than the full-size .pill-toggle used elsewhere (Daily/Weekly/
+   Monthly, brand account type, etc). Flex-shrink:0 keeps it from being squeezed by the
+   title's own flex:1 sibling. */
+.kpi-er-toggle{flex-shrink:0;padding:1px;}
+.kpi-er-toggle button{padding:3px 7px;font-size:9.5px;}
+/* Round 117: the title sits on a flex:1/min-width:0 slot (see .widget-head-row .label)
+   with no clipping of its own, so on narrow grids (e.g. 7 KPI cards per row) where the
+   toggle's fixed-width pills leave the title only a sliver of room, the title text was
+   overflowing its shrunk box and visually rendering underneath/through the toggle instead
+   of stopping at its own edge. Scoped to only the widget-head-row that actually carries a
+   toggle (.has-toggle, set by renderStandardWidget()) so every other KPI/summary-card
+   title keeps its existing un-clipped, can-wrap-to-2-lines behavior untouched. */
+.widget-head-row.has-toggle .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 .footerbar{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:12px;color:var(--text-muted);}
 .btn{background:var(--ink);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:600;}
@@ -2842,6 +2886,13 @@ function fmtSpan(n){ return `<span class="count-up" title="${exactNum(n)}" data-
 // exactNum()'s plain comma-separated whole number instead of fmt()'s K/M abbreviation --
 // used for Followers in Performance Over Time per explicit request ("12,450", never "12.5K").
 function fmtSpanFull(n){ return `<span class="count-up" title="${exactNum(n)}" data-target="${Number(n)||0}" data-full="1">0</span>`; }
+// Round 110: same count-up mechanism as fmtSpan()/fmtSpanFull(), but for KPI cards whose
+// raw value IS a percentage (ERF%, ER%, ERi%) --
+// fmt()'s K/M abbreviation and whole-number rounding would mangle a value like 2.34 into
+// "2", losing the decimal precision that actually matters for a rate this small. Mirrors
+// fmtSpanFull()'s own "data-full" precedent with a new "data-pct" flag instead.
+function exactPct(n){ return (Math.round((Number(n)||0)*10)/10) + "%"; }
+function fmtSpanPct(n){ return `<span class="count-up" title="${exactPct(n)}" data-target="${Number(n)||0}" data-pct="1">0</span>`; }
 function pct(n,d){ if(!d) return "0%"; return Math.round((n/d)*1000)/10 + "%"; }
 
 /* ============================================================
@@ -2857,7 +2908,7 @@ function animateCounters(root){
     // Round 62: fmtSpanFull()'s data-full="1" flag routes this counter through exactNum()'s
     // plain comma-separated formatting instead of fmt()'s K/M abbreviation, for every frame
     // of the animation and the final settled value alike.
-    const format = el.dataset.full==="1" ? exactNum : fmt;
+    const format = el.dataset.full==="1" ? exactNum : (el.dataset.pct==="1" ? exactPct : fmt);
     if(PREFERS_REDUCED_MOTION){ el.textContent = format(target); return; }
     const duration = 650;
     const start = performance.now();
@@ -3346,6 +3397,9 @@ function metricLabel(key){
   // "Avg Total Interactions / post" -> "Avg. Int./Post", dynamically switching to
   // "Avg. Eng./Post" when the global engagement-metric filter is set to Engagements.
   if(key==="avg_engagement") return engagementMetricMode()==="engagements" ? "Avg. Eng./Post" : "Avg. Int./Post";
+  // Round 115: the unified Overview ER card's own key -- label follows whichever of
+  // ERF%/ER%/ERi% the card's own toggle currently has selected, same as the card itself.
+  if(key==="engagement_rate") return { erf:"ERF%", er:"ER%", eri:"ERi%" }[STATE.overviewErMetric||"erf"];
   return KPI_METRIC_LABELS[key]||key;
 }
 
@@ -5245,10 +5299,18 @@ function renderStandardWidget(opts){
   // the summary-card metrics, the followers card -- simply omit the block rather than
   // padding it out with a meaningless "Timeline chart: N/A" line.
   const timelineBlock = opts.timelineHtml ? `<div class="widget-timeline">${opts.timelineHtml}</div>` : "";
+  // Round 117: when this widget carries a toggle (currently only the unified ERF%/ER%/
+  // ERi% card), mark the head row so the title can be truncated with an ellipsis instead
+  // of overflowing its shrunk flex slot and visually rendering underneath/through the
+  // toggle -- reported at narrow grid widths (e.g. 7 KPI cards per row) where the title's
+  // own text was wider than the sliver of space left after the toggle's fixed-width pills
+  // claimed their share of the row. Every other widget (no toggleHtml) is untouched.
+  const headRowClass = opts.toggleHtml ? "widget-head-row has-toggle" : "widget-head-row";
   return `<div class="widget-standard ${opts.wrapperClass}"${opts.dataAttr||""}${style}>
-    <div class="widget-head-row">
+    <div class="${headRowClass}">
       ${opts.iconKey?`<div class="widget-icon">${iconHTML(opts.iconKey)}</div>`:""}
       <div class="label">${opts.title}</div>
+      ${opts.toggleHtml||""}
       ${opts.removeHtml||""}
     </div>
     <div class="value"${dir}>${opts.value}</div>
@@ -5810,18 +5872,31 @@ function renderPerfOverview(){
   // hook are always applied identically. Per explicit request, the remove "x" now only
   // ever shows up when the metric's raw value is exactly 0 -- a populated KPI can't be
   // dismissed this way, only an empty/not-applicable one.
-  function kpiTile(key, iconKey, compareTitle, label, rawValue, sparkId, footHtml, extraFootHtml){
-    if(removedKpis.includes(key)) return "";
+  function kpiTile(key, iconKey, compareTitle, label, rawValue, sparkId, footHtml, extraFootHtml, valueMode, toggleHtml){
+    // Round 116: per explicit request, the unified ERF%/ER%/ERi% card on the main
+    // dashboard must never be closable at all -- bypassing both the removed-KPI-state
+    // lookup (so it can't stay hidden from a stale prior removal either) and the
+    // zero-value "x" below, regardless of which of the 3 metrics is currently toggled or
+    // what its value is.
+    const neverRemovable = key==="engagement_rate";
+    if(!neverRemovable && removedKpis.includes(key)) return "";
     // Round 99: a single owned brand's zero values are real findings, not comparison
     // clutter -- never offer to remove them.
-    const isZero = !rawValue && !isSingleOwnedBrandScope();
+    const isZero = !neverRemovable && !rawValue && !isSingleOwnedBrandScope();
+    // Round 110: optional 9th param -- "pct" renders through fmtSpanPct (decimal-precision
+    // "%", not fmt()'s K/M-abbreviated whole-number rounding) for the 3 new engagement-rate
+    // KPI cards; every existing caller omits this param and keeps the original fmtSpan.
+    // Round 115: optional 10th param -- toggleHtml renders a small control (currently just
+    // the unified ER%/ERi/ERF card's 3-way pill toggle) beside the title, inside the same
+    // head row as the remove "x" -- every other caller omits it and gets none.
     return renderStandardWidget({
       wrapperClass:"card kpi", dataAttr:` data-kpi-key="${esc(key)}"`, iconKey,
-      title:label, value:fmtSpan(rawValue),
+      title:label, value: valueMode==="pct" ? fmtSpanPct(rawValue) : fmtSpan(rawValue),
       timelineHtml: bigdKpiSparkPlaceholder(sparkId),
       subtitleHtml: (footHtml||"&nbsp;") + (extraFootHtml||""),
       bpHtml: kpiCompareButtonsInner(key, compareTitle),
-      removeHtml: isZero ? widgetRemoveBtnHTML("kpi", key, "Remove this KPI", label) : ""
+      removeHtml: isZero ? widgetRemoveBtnHTML("kpi", key, "Remove this KPI", label) : "",
+      toggleHtml: toggleHtml||""
     });
   }
   // Flag/heads-up notice boxes get the same removable treatment -- one box, one stable
@@ -5833,7 +5908,7 @@ function renderPerfOverview(){
 
   $("view-perf-overview").innerHTML = `
     <div class="pagehead-row"><div class="pagehead"><h1>Overview${liveDotHTML()}</h1><p>Scope: <b>${esc(SCOPE_LABELS[P.scope]||P.scope)}</b> — ${esc(P.sourceLabel)}${P.date_from?` — ${formatDatePretty(P.date_from)} → ${formatDatePretty(P.date_to)}`:""}</p></div>
-      <div class="bigd-overview-actions" style="display:flex;gap:8px;align-items:center;position:relative">${exportBtnHTML("overview")}<button class="benchmark-view-btn" id="openBenchmarkViewBtn" type="button">⇄ Benchmark view</button><button class="intel-open-btn" id="openIntelligenceBtn">✨ Data Intelligence</button><button id="askMeToggleBtn" class="ask-me-toggle-btn" type="button">❓ Ask me</button><div id="askMePanel" class="ask-me-panel" style="display:none"></div></div>
+      <div class="bigd-overview-actions" style="display:flex;gap:8px;align-items:center;position:relative">${exportBtnHTML("overview")}<button class="benchmark-view-btn" id="openBenchmarkViewBtn" type="button">⇄ Benchmark view</button><button class="intel-open-btn" id="openIntelligenceBtn">✨ Executive Intelligence</button><button id="askMeToggleBtn" class="ask-me-toggle-btn" type="button">❓ Ask me</button><div id="askMePanel" class="ask-me-panel" style="display:none"></div></div>
     </div>
     ${showScopeToggle?contentScopeToggleHTML("perfOverviewContentScope"):""}
     ${(P.warnings||[]).length?noticeBox("warnings", `<b>Flag:</b> ${P.warnings.map(w=>esc(w)).join("<br>")}`, "Flag notice"):""}
@@ -5856,13 +5931,22 @@ function renderPerfOverview(){
       ${kpiTile("impressions","impressions","Total impressions","Total impressions",t.impressions,"sparkImpressions",
         `${P.impressionsCovered}/${t.posts} posts carried an impressions figure`)}
       ${kpiTile("likes","likes","Total reactions","Total reactions",t.likes,"sparkLikes",
-        `likes / reactions column`)}
+        `likes / reactions column · ${pct(t.likes,t.engagement)} of ${esc(engagementMetricLabel())}`)}
       ${kpiTile("comments","comments","Total comments","Total comments",t.comments,"sparkComments",
-        `&nbsp;`)}
+        `${pct(t.comments,t.engagement)} of ${esc(engagementMetricLabel())}`)}
       ${kpiTile("shares","shares","Total shares","Total shares",t.shares,"sparkShares",
-        `&nbsp;`)}
+        `${pct(t.shares,t.engagement)} of ${esc(engagementMetricLabel())}`)}
       ${kpiTile("video_views","video_views","Video views","Video views",t.video_views,"sparkVideoViews",
         `${t.video_views?'summed across video posts':'no video-view data in this export'}`)}
+      <!-- Round 115: the 3 separate Round 110 engagement-rate cards are unified into ONE
+           KPI card with a 3-way ERF/ER%/ERi pill toggle beside its title (default ERF, per
+           explicit request) -- the toggle switches STATE.overviewErMetric and re-renders
+           this same card in place rather than showing 3 near-duplicate cards side by side.
+           Followers Number (ERF's denominator) is resolved via followersNumberFor(P), which
+           now sums every profile x platform combination in P's own already-globally-filtered
+           row set -- correct for all four report types, and automatically narrower once the
+           global Brand/Platform filter narrows P itself (see benchmarkFollowersTotal()). -->
+      ${erKpiTileHTML(P, t, kpiTile)}
     </div>
     ${renderOverviewBreakdownHTML(P, t)}`;
   if(showScopeToggle) bindContentScopeToggles($("view-perf-overview"), renderPerfOverview);
@@ -5877,6 +5961,15 @@ function renderPerfOverview(){
   renderOverviewBreakdownCharts(P);
   animateCardsIn($("view-perf-overview"));
   animateCounters($("view-perf-overview"));
+  // Round 115: the unified ERF/ER%/ERi toggle -- same delegated-per-render click pattern
+  // as #perfFreqToggle (Daily/Weekly/Monthly) above; the card itself may be absent (removed
+  // via its own "x", or STATE.performance not loaded), so this guards for null.
+  const erToggleEl = $("overviewErMetricToggle");
+  if(erToggleEl) erToggleEl.addEventListener("click", (e)=>{
+    const btn = e.target.closest("button"); if(!btn) return;
+    STATE.overviewErMetric = btn.dataset.erMetric;
+    renderPerfOverview();
+  });
 }
 
 function exportOverviewSection(config){
@@ -6052,29 +6145,35 @@ function renderPerfBrandCombo(P, granularity, containerId){
     ...interactionsByBrand.map(m=>Object.keys(m))
   ))).sort();
 
+  // Round 119: per explicit request, the per-brand totals cards move from a narrow side
+  // column (beside the charts) into one dynamic-width horizontal row ABOVE both charts --
+  // same .card.kpi design/typography the Engagements section's own summary cards use
+  // (.grid > .card.kpi with .label/.value/.foot), just with 2 stacked label/value pairs per
+  // card (Posts, then the engagement metric) since each card here covers one brand's own 2
+  // headline numbers rather than 1 metric across the whole dataset. The colored left border
+  // (matching this brand's own line color in the charts below) is kept -- it's how a reader
+  // ties a card back to its line/legend entry, not a stylistic leftover. The charts
+  // themselves are now the only content below the title row, so they naturally fill the
+  // widget's full width instead of being squeezed beside the card column.
   const cardsHTML = brands.map((b,i)=>{
     const t = aggByBrand[i].totals || {posts:0, engagement:0};
-    return `<div class="card" style="padding:10px 12px;border-left:4px solid ${esc(colorMap[b])}">
-      <div style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em" dir="auto">${esc(b)}</div>
-      <div style="margin-top:6px">
-        <div style="font-size:17px;font-weight:800">${fmtSpan(t.posts)}</div><div style="font-size:10px;color:var(--text-muted)">Posts</div>
-      </div>
-      <div style="margin-top:6px">
-        <div style="font-size:17px;font-weight:800">${fmtSpan(t.engagement)}</div><div style="font-size:10px;color:var(--text-muted)">${esc(engagementMetricLabel())}</div>
-      </div>
+    return `<div class="card kpi" style="border-left:4px solid ${esc(colorMap[b])}">
+      <div class="label" dir="auto">${esc(b)}</div>
+      <div class="value">${fmtSpan(t.posts)}</div>
+      <div class="foot">Posts</div>
+      <div class="value" style="margin-top:8px">${fmtSpan(t.engagement)}</div>
+      <div class="foot">${esc(engagementMetricLabel())}</div>
     </div>`;
   }).join("");
 
   container.insertAdjacentHTML("beforeend", `
     <div class="card" style="margin-top:16px">
       <div class="card-head-row"><h3>Posts &amp; ${esc(engagementMetricLabel())} by brand</h3></div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
-        <div style="flex:1 1 360px;min-width:300px;display:flex;flex-direction:column;gap:6px">
-          <div class="chart-wrap" style="height:170px"><canvas id="perfBrandLineChart"></canvas></div>
-          <div class="chart-wrap" style="height:170px"><canvas id="perfBrandBarChart"></canvas></div>
-          <div class="pie-legend-row" id="perfBrandComboLegend" style="margin-top:2px"></div>
-        </div>
-        <div style="flex:0 0 220px;max-width:220px;min-width:170px;display:flex;flex-direction:column;gap:8px">${cardsHTML}</div>
+      <div class="grid" style="grid-template-columns:repeat(${brands.length},1fr);margin-bottom:16px">${cardsHTML}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="chart-wrap" style="height:170px"><canvas id="perfBrandLineChart"></canvas></div>
+        <div class="chart-wrap" style="height:170px"><canvas id="perfBrandBarChart"></canvas></div>
+        <div class="pie-legend-row" id="perfBrandComboLegend" style="margin-top:2px"></div>
       </div>
     </div>`);
 
@@ -6300,29 +6399,27 @@ function renderPerfPlatformCombo(P, granularity, containerId){
     ...interactionsByPlatform.map(m=>Object.keys(m))
   ))).sort();
 
+  // Round 119: same repositioning as renderPerfBrandCombo() above -- see its comment for
+  // the full reasoning (this is its platform-mode twin, same .card.kpi design/layout).
   const cardsHTML = platforms.map((pf,i)=>{
     const t = aggByPlatform[i].totals || {posts:0, engagement:0};
-    return `<div class="card" style="padding:10px 12px;border-left:4px solid ${esc(colorMap[pf])}">
-      <div style="font-size:10.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em" dir="auto">${platformIconHTML(pf)} ${esc(pf)}</div>
-      <div style="margin-top:6px">
-        <div style="font-size:17px;font-weight:800">${fmtSpan(t.posts)}</div><div style="font-size:10px;color:var(--text-muted)">Posts</div>
-      </div>
-      <div style="margin-top:6px">
-        <div style="font-size:17px;font-weight:800">${fmtSpan(t.engagement)}</div><div style="font-size:10px;color:var(--text-muted)">${esc(engagementMetricLabel())}</div>
-      </div>
+    return `<div class="card kpi" style="border-left:4px solid ${esc(colorMap[pf])}">
+      <div class="label" dir="auto">${platformIconHTML(pf)} ${esc(pf)}</div>
+      <div class="value">${fmtSpan(t.posts)}</div>
+      <div class="foot">Posts</div>
+      <div class="value" style="margin-top:8px">${fmtSpan(t.engagement)}</div>
+      <div class="foot">${esc(engagementMetricLabel())}</div>
     </div>`;
   }).join("");
 
   container.insertAdjacentHTML("beforeend", `
     <div class="card" style="margin-top:16px">
       <div class="card-head-row"><h3>Posts &amp; ${esc(engagementMetricLabel())} by platform</h3></div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch">
-        <div style="flex:1 1 360px;min-width:300px;display:flex;flex-direction:column;gap:6px">
-          <div class="chart-wrap" style="height:170px"><canvas id="perfPlatformLineChart"></canvas></div>
-          <div class="chart-wrap" style="height:170px"><canvas id="perfPlatformBarChart"></canvas></div>
-          <div class="pie-legend-row" id="perfPlatformComboLegend" style="margin-top:2px"></div>
-        </div>
-        <div style="flex:0 0 220px;max-width:220px;min-width:170px;display:flex;flex-direction:column;gap:8px">${cardsHTML}</div>
+      <div class="grid" style="grid-template-columns:repeat(${platforms.length},1fr);margin-bottom:16px">${cardsHTML}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div class="chart-wrap" style="height:170px"><canvas id="perfPlatformLineChart"></canvas></div>
+        <div class="chart-wrap" style="height:170px"><canvas id="perfPlatformBarChart"></canvas></div>
+        <div class="pie-legend-row" id="perfPlatformComboLegend" style="margin-top:2px"></div>
       </div>
     </div>`);
 
@@ -7213,6 +7310,43 @@ function blocksToAOA(blocks){
   });
   return aoa;
 }
+// Round 120: per explicit request, Benchmarking exports are restructured from "one sheet
+// per compared column" (brand/platform/range) to "one sheet per SECTION" (KPI Summary,
+// Posting Timeline, engagement split, Media Type Breakdown, Top/Lowest 10 Posts) -- with
+// every compared column laid out side by side, 2 blank columns apart, on that one shared
+// sheet, rather than stacked vertically across separate sheets. entityBlocks is one
+// {label, headers, rows} per column for THIS section (same shape blocksToAOA takes, minus
+// the title -- the sheet itself already carries the section name). Each column's own
+// label becomes a mini-title row spanning its own column-block; a column with fewer data
+// rows than its neighbors (e.g. a shorter date range, or fewer than 10 posts) just gets
+// blank cells for the remainder -- Excel doesn't need every column-block to be the same
+// height, only the same STARTING row, which this guarantees.
+function combineSectionBlocksHorizontally(entityBlocks){
+  const GAP = 2;
+  const pad = (arr, len)=>{
+    arr = (arr||[]).slice(0, len);
+    while(arr.length < len) arr.push("");
+    return arr;
+  };
+  const colCounts = entityBlocks.map(b=>(b.headers||[]).length || 1);
+  const maxDataRows = Math.max(0, ...entityBlocks.map(b=>(b.rows||[]).length));
+  const totalRows = 2 + maxDataRows; // label row + header row + data rows
+  const aoa = [];
+  for(let r=0; r<totalRows; r++){
+    let row = [];
+    entityBlocks.forEach((b,bi)=>{
+      const cols = colCounts[bi];
+      let cells;
+      if(r===0) cells = pad([b.label], cols);
+      else if(r===1) cells = pad(b.headers, cols);
+      else cells = pad((b.rows||[])[r-2], cols);
+      row = row.concat(cells);
+      if(bi < entityBlocks.length-1) row = row.concat(Array(GAP).fill(""));
+    });
+    aoa.push(row);
+  }
+  return aoa;
+}
 function exportWorkbook(filenameBase, sheetSpecs){
   if(typeof XLSX==="undefined" || !XLSX.utils || !XLSX.utils.book_new){
     if(typeof toast==="function") toast("Excel export library isn't available in this file.");
@@ -7271,7 +7405,12 @@ const EXPORT_HANDLERS = {
 function openExportPopup(sectionKey){
   const base = STATE.performance;
   if(!base) return;
-  const multiBrand = (base.profiles||[]).length>1;
+  // Round 116: Performance Over Time compares ONE brand (STATE.timeBenchBrand) across
+  // different date ranges -- it never has multiple brands to choose from, so its export
+  // popup's custom step never shows the (here, meaningless) Brand checkbox group, only
+  // Platform. Brand & Platform Comparison keeps the normal export popup's behavior since
+  // its own dimension genuinely can be either.
+  const multiBrand = sectionKey==="timebench" ? false : (base.profiles||[]).length>1;
   const multiPlatform = (base.platforms||[]).length>1;
   STATE.exportPopup = {
     sectionKey, step:"method", method:"current",
@@ -7421,6 +7560,8 @@ function runResolvedExport(s){
   const key = s.sectionKey;
   if(key==="compare") exportCompareWidget(config);
   else if(key==="intelligence") exportIntelligenceReport(config);
+  else if(key==="benchmark") exportBenchmarkView(config);
+  else if(key==="timebench") exportTimeBenchView(config);
   else if(EXPORT_HANDLERS[key]) EXPORT_HANDLERS[key](config);
 }
 function paintMiniKpi(containerId, rows, metricKey, breakdownField){
@@ -7439,8 +7580,14 @@ function paintMiniKpi(containerId, rows, metricKey, breakdownField){
     return;
   }
 
+  // Round 115: "engagement_rate" (the unified ERF%/ER%/ERi% Overview card) is a computed
+  // ratio, not a summable field on totals -- t.engagement_rate doesn't exist, so it needs
+  // its own branch rather than falling into the generic t[metricKey]||0 read (which would
+  // silently show 0 for every entity here).
+  const isErMetric = metricKey==="engagement_rate";
   let val;
-  if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
+  if(isErMetric) val = erMetricCurrentValue(t.engagement, t.reach, t.impressions, benchmarkFollowersTotal(null, agg));
+  else if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
   else val = t[metricKey]||0;
 
   let breakdownHTML = "";
@@ -7448,17 +7595,37 @@ function paintMiniKpi(containerId, rows, metricKey, breakdownField){
     const list = breakdownField==="platform" ? (agg.byPlatform||[]) : (agg.byProfile||[]);
     const labelKey = breakdownField==="platform" ? "platform" : "profile";
     if(list.length>1){
-      const metricOf = (x)=> metricKey==="avg_engagement" ? (x.posts?x.engagement/x.posts:0) : (x[metricKey]||0);
+      // For the ERF%-flavored reading specifically, each breakdown row's own followers
+      // denominator must be scoped to just that row's platform (when breaking down by
+      // platform, within a rows set already scoped to one brand) or just that row's
+      // profile (when breaking down by profile, within a rows set already scoped to one
+      // platform) -- never the whole tile's combined followers figure.
+      const followersCombos = Object.values(agg.followersByProfilePlatform||{});
+      const metricOf = (x)=>{
+        if(metricKey==="avg_engagement") return x.posts?x.engagement/x.posts:0;
+        if(isErMetric){
+          const matching = breakdownField==="platform" ? followersCombos.filter(c=>c.platform===x.platform) : followersCombos.filter(c=>c.profile===x.profile);
+          const followersNum = matching.reduce((a,c)=>a+(c.value||0),0);
+          return erMetricCurrentValue(x.engagement, x.reach, x.impressions, followersNum);
+        }
+        return x[metricKey]||0;
+      };
+      const fmtBreakdownVal = (v)=> isErMetric ? (Math.round(v*10)/10)+"%" : fmt(v);
       const parts = [...list].sort((a,b)=>metricOf(b)-metricOf(a)).map(x=>
         breakdownField==="platform"
-          ? `${fmt(metricOf(x))} on ${platformIconHTML(x[labelKey])} ${esc(x[labelKey])}`
-          : `${fmt(metricOf(x))} on ${esc(x[labelKey])}`
+          ? `${fmtBreakdownVal(metricOf(x))} on ${platformIconHTML(x[labelKey])} ${esc(x[labelKey])}`
+          : `${fmtBreakdownVal(metricOf(x))} on ${esc(x[labelKey])}`
       );
       if(parts.length) breakdownHTML = `<div style="font-size:10.5px;color:var(--text-muted);margin-top:6px" dir="auto">${parts.join(" · ")}</div>`;
     }
   }
 
-  el.innerHTML = `<div style="font-size:22px;font-weight:800">${fmtSpan(val)}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(metricLabel(metricKey))}</div>${breakdownHTML}`;
+  // fmtSpanPct (not fmtSpan) for the ER metric -- same animated .count-up span every
+  // other mini-tile value uses (animateCounters() picks these up after render), just with
+  // percentage-aware decimal formatting via its own data-pct="1" marker, matching how the
+  // real Overview card renders this same figure.
+  const valueHtml = isErMetric ? fmtSpanPct(val) : fmtSpan(val);
+  el.innerHTML = `<div style="font-size:22px;font-weight:800">${valueHtml}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(metricLabel(metricKey))}</div>${breakdownHTML}`;
 }
 
 function paintMiniDominant(containerId, rows, field){
@@ -7489,12 +7656,20 @@ function paintMiniDominant(containerId, rows, field){
 // logic are unaffected either way -- this is a markup/style-only revert.
 function compareBtnHTML(kind, title, metricKey){
   if(!STATE.performance) return "";
+  // Round 115: these buttons must be scoped to the CURRENTLY ACTIVE global brand/platform
+  // filter, not the export's raw, unfiltered brand/platform list -- otherwise "Compare
+  // brands" keeps offering brands the user has already filtered out, and the button never
+  // disappears even once the global filter has narrowed the view down to a single brand/
+  // platform with nothing left to compare. getActivePerformanceView() is the same
+  // filter-aware view every other render function already reads from.
+  const P = getActivePerformanceView();
+  if(!P) return "";
   const metricAttr = metricKey ? ` data-metric="${esc(metricKey)}"` : "";
   let html = "";
-  if((STATE.performance.profiles||[]).length>1){
+  if((P.profiles||[]).length>1){
     html += `<button class="compare-btn" data-compare-dim="brand" data-compare-kind="${esc(kind)}" data-compare-title="${esc(title)}"${metricAttr}>⇄ Compare brands</button>`;
   }
-  if((STATE.performance.platforms||[]).length>1){
+  if((P.platforms||[]).length>1){
     html += `<button class="compare-btn" data-compare-dim="platform" data-compare-kind="${esc(kind)}" data-compare-title="${esc(title)}"${metricAttr}>⇄ Compare platforms</button>`;
   }
   return html ? `<div class="compare-btn-group">${html}</div>` : "";
@@ -7507,8 +7682,13 @@ function compareBtnHTML(kind, title, metricKey){
 function kpiCompareButtonsInner(metricKey, title, kind){
   kind = kind || "kpi";
   if(!STATE.performance) return "";
-  const multiBrand = (STATE.performance.profiles||[]).length>1;
-  const multiPlatform = (STATE.performance.platforms||[]).length>1;
+  // Round 115: same global-filter-aware fix as compareBtnHTML() -- the per-card "B"/"P"
+  // mini buttons must reflect the currently active brand/platform filter, not the export's
+  // full raw entity list.
+  const P = getActivePerformanceView();
+  if(!P) return "";
+  const multiBrand = (P.profiles||[]).length>1;
+  const multiPlatform = (P.platforms||[]).length>1;
   if(!multiBrand && !multiPlatform) return "";
   return `${multiBrand?`<button class="compare-btn-mini" data-compare-dim="brand" data-compare-kind="${esc(kind)}" data-compare-title="${esc(title)}" data-metric="${esc(metricKey)}" title="Compare brands">B</button>`:""}
     ${multiPlatform?`<button class="compare-btn-mini" data-compare-dim="platform" data-compare-kind="${esc(kind)}" data-compare-title="${esc(title)}" data-metric="${esc(metricKey)}" title="Compare platforms">P</button>`:""}`;
@@ -7519,7 +7699,11 @@ function kpiCompareBtnHTML(metricKey, title, kind){
 }
 
 function openWidgetCompare(dimension, kind, title, opts){
-  const base = STATE.performance;
+  // Round 115: scoped to the active global brand/platform filter (getActivePerformanceView()),
+  // not the raw export -- so a "Compare brands" click while the global filter is narrowed to
+  // one brand correctly finds nothing to compare, matching the button already being hidden
+  // for that same reason (see compareBtnHTML()/kpiCompareButtonsInner()).
+  const base = getActivePerformanceView();
   if(!base) return;
   const entities = dimension==="brand" ? (base.profiles||[]) : (base.platforms||[]);
   if(entities.length<2) return;
@@ -7533,7 +7717,12 @@ function renderWidgetCompareBody(){
   const context = STATE.compareContext;
   if(!context) return;
   const {dimension, kind, title, opts} = context;
-  const base = STATE.performance;
+  // Round 115: the comparison popup's own universe of brands/platforms/rows must be the
+  // ACTIVE global-filter-scoped view, not the raw export -- the popup's local Brand/
+  // Platform dropdowns below then further narrow WITHIN that already-scoped universe,
+  // rather than starting from every brand/platform in the export regardless of what the
+  // global filter bar currently shows.
+  const base = getActivePerformanceView();
   if(!base) return;
   const filter = STATE.compareFilter || { brand:"all", platform:"all" };
   const rowField = dimension==="brand" ? "profile" : "platform";
@@ -7641,7 +7830,10 @@ function exportCompareWidget(config){
   const context = STATE.compareContext;
   if(!context) return;
   const {dimension, kind, title, opts} = context;
-  const base = STATE.performance;
+  // Round 115: same global-filter scoping as openWidgetCompare()/renderWidgetCompareBody() --
+  // the exported workbook must reflect whatever brand/platform scope the dashboard's global
+  // filter bar is currently showing, not the export's full raw entity list.
+  const base = getActivePerformanceView();
   if(!base) return;
   const useCustom = config && config.custom;
   const ignoreWidgetFilters = useCustom && config.widgetFilterMode==="ignore";
@@ -7671,7 +7863,7 @@ function exportCompareWidget(config){
     ["Widget filter - Brand", ignoreWidgetFilters ? "Ignored" : (filter.brand==="all"?"All brands":filter.brand)],
     ["Widget filter - Platform", ignoreWidgetFilters ? "Ignored" : (filter.platform==="all"?"All platforms":filter.platform)],
     ["Widget filter - Content scope", cap(contentScope)],
-    ["Note", useCustom ? "Scope reflects this export's brand/platform selection." : "This popup filters independently of the main dashboard's global filter bar."]
+    ["Note", useCustom ? "Scope reflects this export's brand/platform selection." : "Scope reflects the dashboard's active global Brand/Platform filter; the widget filter above narrows further within it."]
   ];
 
   const sheets = entries.map(b=>{
@@ -7688,7 +7880,11 @@ function exportCompareWidget(config){
         aoa = followersWidgetsToAOA(computeFollowersWidgets(rows));
       } else {
         let val;
-        if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
+        // Round 115 hotfix: same "engagement_rate" special case as paintMiniKpi() -- this
+        // metric has no summable field on totals, so exporting it needs to compute
+        // whichever of ERF%/ER%/ERi% is currently selected rather than reading undefined.
+        if(metricKey==="engagement_rate") val = erMetricCurrentValue(t.engagement, t.reach, t.impressions, benchmarkFollowersTotal(null, agg));
+        else if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
         else val = t[metricKey]||0;
         aoa = [["Metric","Value"],[metricLabel(metricKey), val]];
       }
@@ -7706,6 +7902,213 @@ function exportCompareWidget(config){
   });
   exportWorkbook(title||"Compare", sheets);
 }
+// Round 116: shared metric list for BOTH Benchmarking exports below -- exactly the same
+// keys/labels/order as benchmarkKpiCardsHTML()/timeBenchKpiCardsHTML() already render on
+// screen, so the workbook never drifts from what the user is actually looking at.
+function benchmarkExportMetricList(){
+  return [
+    {key:"posts", label:"Posts"},
+    {key:"engagement", label:engagementMetricLabel()},
+    {key:"avgPerPost", label:"Avg/post"},
+    {key:"reach", label:"Reach"},
+    {key:"impressions", label:"Impressions"},
+    {key:"likes", label:"Likes"},
+    {key:"comments", label:"Comments"},
+    {key:"shares", label:"Shares"},
+    {key:"followers", label:"Followers"},
+    {key:"video_views", label:"Video views"},
+    {key:"erf_1k_followers", label:"ERF%"},
+    {key:"er_by_reach", label:"ER%"},
+    {key:"eri_by_impressions", label:"ERi%"}
+  ];
+}
+// Round 118: per explicit request, exporting a Benchmarking view must capture ALL the
+// data behind each column, not just its KPI Summary card -- every other section visible on
+// screen (Posting Timeline, engagement-metric split, Media Type breakdown, Top 10 / Lowest
+// 10 Posts) is now included too, each as its own clearly-titled block within that column's
+// one sheet. Charts themselves can't export (they're pixels); this pulls the SAME
+// underlying data each chart is built from (bucketDailyMap/benchmarkTimelineBuckets,
+// engagementSplitSlices, P.mediaType/mediaTypeInteractions, P.topPosts) so the numbers
+// always match what's on screen. Shared by both Benchmarking branches -- metricValueFn(key)
+// is the caller's own already-scoped KPI lookup (benchmarkMetricValue/timeBenchMetricValue,
+// each closed over their own brand/range's t/P), so this function only assembles export
+// blocks and never re-derives a metric formula of its own. range ({from,to} or null) is
+// only used for the Posting Timeline section's zero-padded bucket list.
+function benchmarkExportSectionBlocks(P, metricValueFn, range){
+  const blocks = [];
+  const engLabel = engagementMetricLabel();
+
+  const metrics = benchmarkExportMetricList();
+  blocks.push({ title:"KPI Summary", headers:["Metric","Value"], rows: metrics.map(m=>[m.label, metricValueFn(m.key)]) });
+
+  const granularity = STATE.benchmarkGranularity || "daily";
+  const bucketPosts = bucketDailyMap(P.dailyPostsTotal, granularity);
+  const bucketInteractions = bucketDailyMap(P.dailyInteractionsTotal, granularity);
+  const buckets = benchmarkTimelineBuckets(range, granularity, bucketPosts, bucketInteractions);
+  blocks.push({ title:"Posting Timeline", headers:["Date","Posts", engLabel],
+    rows: buckets.map(b=>[bigdDashDate(b), bucketPosts[b]||0, bucketInteractions[b]||0]) });
+
+  const slices = engagementSplitSlices(P.rowsData||[]);
+  blocks.push({ title:`${engLabel} split`, headers:["Component", engLabel],
+    rows: slices.labels.map((l,i)=>[l, slices.data[i]||0]) });
+
+  const mtKeys = Array.from(new Set([...Object.keys(P.mediaType||{}), ...Object.keys(P.mediaTypeInteractions||{})]));
+  const mtRows = mtKeys.map(k=>{
+    const mposts = (P.mediaType||{})[k]||0;
+    const minteractions = (P.mediaTypeInteractions||{})[k]||0;
+    return { key:k, posts:mposts, interactions:minteractions, avg: mposts ? minteractions/mposts : 0 };
+  }).sort((a,b)=>b.posts-a.posts);
+  blocks.push({ title:"Media Type Breakdown", headers:["Media type","Posts",engLabel,"Avg/post"],
+    rows: mtRows.map(r=>[cap(r.key), r.posts, r.interactions, Math.round(r.avg*10)/10]) });
+
+  const postRowsFor = posts => posts.length
+    ? posts.map((p,i)=>[i+1, cap(p.platform||""), p.date?formatDatePretty(p.date):"", cap(p.media_type||""), p.caption||"", p.permalink||"", p.engagement||0])
+    : [["No posts for this column in the current filter."]];
+  blocks.push({ title:"Top 10 Posts", headers:["Rank","Platform","Date","Media type","Caption","Permalink",engLabel],
+    rows: postRowsFor((P.topPosts||[]).slice(0,10)) });
+  blocks.push({ title:"Lowest 10 Posts", headers:["Rank","Platform","Date","Media type","Caption","Permalink",engLabel],
+    rows: postRowsFor((P.topPosts||[]).slice(-10)) });
+
+  return blocks;
+}
+// Round 116 -- Export option for the Brand & Platform Comparison Benchmarking branch.
+// Default ("I already made my filters"): one sheet per CURRENTLY VISIBLE column
+// (STATE.benchmarkBrands -- despite the name, this is whichever entities are currently
+// shown, brands or platforms depending on STATE.benchmarkMode), computed via the exact
+// same benchmarkAggFor()/benchmarkMetricValue() the on-screen cards already use, so the
+// export always matches "all sections according to filters submitted" -- the active
+// Platforms-narrowing pill, Media/Content type filters, and Fixed Date Range included.
+// Custom ("I want to choose what to export"): the popup's own Brand/Platform checkboxes
+// pick which columns become sheets (whichever dimension matches the current
+// STATE.benchmarkMode), and "Ignore current widget filters" temporarily widens every
+// narrowing filter to "everything" for just this export (STATE is snapshotted and always
+// restored in the finally block, so the live view on screen is never actually touched).
+function exportBenchmarkView(config){
+  if(!STATE.performance) return;
+  const mode = STATE.benchmarkMode || "brand";
+  const useCustom = config && config.custom;
+  const ignoreWidgetFilters = useCustom && config.widgetFilterMode==="ignore";
+  const allColumnEntities = benchmarkColumnEntities();
+  if(!allColumnEntities.length) return;
+
+  let columnEntities;
+  if(useCustom){
+    const picked = mode==="platform" ? config.platforms : config.brands;
+    columnEntities = (!picked || !picked.length || picked.includes("all")) ? allColumnEntities.slice() : picked.filter(e=>allColumnEntities.includes(e));
+  } else {
+    columnEntities = (STATE.benchmarkBrands && STATE.benchmarkBrands.length) ? STATE.benchmarkBrands.filter(e=>allColumnEntities.includes(e)) : allColumnEntities.slice();
+  }
+  if(!columnEntities.length) columnEntities = allColumnEntities.slice();
+
+  const snapshot = {
+    benchmarkPlatforms: STATE.benchmarkPlatforms, benchmarkMediaTypes: STATE.benchmarkMediaTypes,
+    benchmarkContentTypes: STATE.benchmarkContentTypes, benchmarkFixedRangeActive: STATE.benchmarkFixedRangeActive,
+    benchmarkDateRanges: STATE.benchmarkDateRanges
+  };
+  try{
+    if(ignoreWidgetFilters){
+      STATE.benchmarkPlatforms = (STATE.performance.platforms||[]).slice();
+      STATE.benchmarkMediaTypes = benchmarkMediaTypeOptions();
+      STATE.benchmarkContentTypes = benchmarkContentTypeOptions();
+      STATE.benchmarkFixedRangeActive = false;
+      STATE.benchmarkDateRanges = {};
+    } else if(useCustom && mode==="brand" && config.platforms && config.platforms.length && !config.platforms.includes("all")){
+      // The popup's own Platform checkboxes double as this export's "narrow every column
+      // by platform" filter for brand-mode columns, mirroring the on-screen pill row's
+      // role -- only applied when the user actually picked specific platforms.
+      STATE.benchmarkPlatforms = config.platforms;
+    }
+    const extraLines = [
+      ["Benchmarking type", "Brand & Platform Comparison"],
+      ["Compared by", mode==="platform" ? "Platform" : "Brand"],
+      ["Export mode", useCustom ? "Custom selection" : "Current benchmarking view filters"],
+      ["Note", "Each sheet below is ONE section (KPI Summary, Posting Timeline, engagement split, Media Type Breakdown, Top/Lowest 10 Posts) with every compared column laid out side by side on that same sheet -- 2 blank columns apart -- rather than one sheet per column. Each column's own label (its block's first row) carries its own effective date range, which can differ per column."]
+    ];
+    // Round 120: compute every column's full section-block list once, then pivot --
+    // one sheet PER SECTION, with every column's own {label, headers, rows} for that
+    // section combined side by side via combineSectionBlocksHorizontally(). All columns
+    // share the exact same section list/order (benchmarkExportSectionBlocks() always
+    // returns the same 6 sections in the same order), so indexing perEntity[0]'s own
+    // blocks for titles/order is safe regardless of which column happens to be first.
+    const perEntity = columnEntities.map(entity=>{
+      const P = benchmarkAggFor(entity);
+      const t = P.totals || {};
+      const range = benchmarkEffectiveRange(entity);
+      const rangeLabel = (range && range.from && range.to) ? `${formatDatePretty(range.from)} → ${formatDatePretty(range.to)}` : "Full available range";
+      const blocks = benchmarkExportSectionBlocks(P, key=>benchmarkMetricValue(key, entity, t, P), range);
+      return { label: `${entity} (${rangeLabel})`, blocks };
+    });
+    const sectionCount = perEntity.length ? perEntity[0].blocks.length : 0;
+    const sheets = [];
+    for(let si=0; si<sectionCount; si++){
+      const sectionTitle = perEntity[0].blocks[si].title;
+      const entityBlocksForSection = perEntity.map(pe=>({ label: pe.label, headers: pe.blocks[si].headers, rows: pe.blocks[si].rows }));
+      sheets.push(makeSheet(sectionTitle, combineSectionBlocksHorizontally(entityBlocksForSection), config, extraLines));
+    }
+    exportWorkbook("Brand & Platform Comparison", sheets);
+  } finally {
+    STATE.benchmarkPlatforms = snapshot.benchmarkPlatforms;
+    STATE.benchmarkMediaTypes = snapshot.benchmarkMediaTypes;
+    STATE.benchmarkContentTypes = snapshot.benchmarkContentTypes;
+    STATE.benchmarkFixedRangeActive = snapshot.benchmarkFixedRangeActive;
+    STATE.benchmarkDateRanges = snapshot.benchmarkDateRanges;
+  }
+}
+// Round 116 -- Export option for the Performance Over Time (time-based) Benchmarking
+// branch. This view always compares ONE brand (STATE.timeBenchBrand) across its own
+// user-defined date ranges, so the sheet axis is always "one sheet per range" (never per
+// brand) -- the popup's Brand checkbox group is hidden entirely for this section (see
+// openExportPopup()) since there is nothing to choose there. Platform narrowing and
+// "ignore current widget filters" work the same way as the Brand & Platform Comparison
+// branch above.
+function exportTimeBenchView(config){
+  if(!STATE.performance || !STATE.timeBenchBrand) return;
+  const ranges = STATE.timeBenchRanges || [];
+  if(!ranges.length) return;
+  const useCustom = config && config.custom;
+  const ignoreWidgetFilters = useCustom && config.widgetFilterMode==="ignore";
+
+  const snapshot = {
+    timeBenchPlatforms: STATE.timeBenchPlatforms, timeBenchMediaTypes: STATE.timeBenchMediaTypes,
+    timeBenchContentTypes: STATE.timeBenchContentTypes
+  };
+  try{
+    if(ignoreWidgetFilters){
+      STATE.timeBenchPlatforms = (STATE.performance.platforms||[]).slice();
+      STATE.timeBenchMediaTypes = null;
+      STATE.timeBenchContentTypes = null;
+    } else if(useCustom && config.platforms && config.platforms.length && !config.platforms.includes("all")){
+      STATE.timeBenchPlatforms = config.platforms;
+    }
+    const extraLines = [
+      ["Benchmarking type", "Performance Over Time"],
+      ["Brand", STATE.timeBenchBrand],
+      ["Export mode", useCustom ? "Custom selection" : "Current benchmarking view filters"],
+      ["Note", "Each sheet below is ONE section (KPI Summary, Posting Timeline, engagement split, Media Type Breakdown, Top/Lowest 10 Posts) with every compared range laid out side by side on that same sheet -- 2 blank columns apart -- rather than one sheet per range. Each range's own label (its block's first row) carries its own actual dates."]
+    ];
+    // Round 120: same section-sheet pivot as exportBenchmarkView() above -- see its
+    // comment for the full reasoning.
+    const perEntity = ranges.map((range, i)=>{
+      const P = timeBenchAggFor(i);
+      const t = P.totals || {};
+      const blocks = benchmarkExportSectionBlocks(P, key=>timeBenchMetricValue(key, t, P), range);
+      return { label: `${timeBenchRangeShortLabel(i)}: ${timeBenchRangeLabel(i)}`, blocks };
+    });
+    const sectionCount = perEntity.length ? perEntity[0].blocks.length : 0;
+    const sheets = [];
+    for(let si=0; si<sectionCount; si++){
+      const sectionTitle = perEntity[0].blocks[si].title;
+      const entityBlocksForSection = perEntity.map(pe=>({ label: pe.label, headers: pe.blocks[si].headers, rows: pe.blocks[si].rows }));
+      sheets.push(makeSheet(sectionTitle, combineSectionBlocksHorizontally(entityBlocksForSection), config, extraLines));
+    }
+    exportWorkbook("Performance Over Time", sheets);
+  } finally {
+    STATE.timeBenchPlatforms = snapshot.timeBenchPlatforms;
+    STATE.timeBenchMediaTypes = snapshot.timeBenchMediaTypes;
+    STATE.timeBenchContentTypes = snapshot.timeBenchContentTypes;
+  }
+}
+
 function cap(s){ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); }
 
 const CONTENT_CATEGORIES = [
@@ -8043,8 +8446,775 @@ function exportIntelligenceReport(config){
   (P.warnings||[]).forEach(w=>dq.push(["Flag", unescapeEntities(String(w).replace(/\s*—\s*/g, ", "))]));
   sheets.push(makeSheet("Data quality", dq, config));
 
-  exportWorkbook("Data Intelligence Report", sheets);
+  exportWorkbook("Executive Intelligence Report", sheets);
 }
+/* ============================================================
+   Round 111: "Data Intelligence" -> "Executive Intelligence".
+   The button (#openIntelligenceBtn, unchanged id/class/location) and its overlay
+   (#intelligenceOverlay, unchanged markup) are reused as-is -- only the label and the
+   panel's own rendered content change. This is the SECOND analytical layer described in
+   the request: not a repeat of the dashboard's own numbers, but a deterministic,
+   evidence-based rules engine (computeExecutiveFindings) that only reports a pattern when
+   the uploaded export actually supports it, with every finding traceable to specific
+   evidence and, where relevant, specific posts (with clickable permalinks reusing the
+   dashboard's existing permalink field).
+   Phase 1 scope (this round): rename the button, wire the engine to the existing
+   aggregated data (no second calculation system), implement rules 1-10, score/dedupe/cap
+   candidates, and render Executive summary / Key findings / What's driving performance /
+   Recommendations / Watchouts. Evidence-per-finding and post-level driver evidence are
+   included now since the request states them as hard requirements, not later phases.
+   Deferred to later rounds (per the request's own phased rollout): click-to-highlight the
+   relevant chart/KPI card from a finding, the multi-brand-multi-platform combo matrix
+   view, an LLM-authored narrative layer on top of these verified findings (needs an
+   explicit decision on how a static, backend-less HTML file would hold an API key), and
+   an analyst feedback mechanism.
+   ============================================================ */
+
+// Reuses the exact same previous-period aggregation that already powers the KPI "vs
+// previous period" deltas (see bigdComputePreviousRange/computeBigdPreviousPeriodAgg) --
+// never a second, competing calculation of "the prior period".
+function execIntelPrevAgg(){ return computeBigdPreviousPeriodAgg(); }
+
+// The "structured representation" the request asks the intelligence layer to receive --
+// built entirely from data the dashboard has already computed (aggregatePerformanceRows /
+// getActivePerformanceView / followersNumberFor), never a second parallel calculation.
+// Mirrors benchmarkFollowersTotal()'s safe-mode-only logic (single combo -> its value;
+// one brand's own multiple platforms -> their own sum; anything ambiguous across
+// different brands -> 0, since different companies' audiences are never summed) but
+// operates on an already-computed aggregatePerformanceRows() result instead of raw rows
+// -- needed because the "previous period" aggregate has no rowsData of its own to hand
+// back into followersNumberFor()/computeFollowersWidgets().
+function execFollowersNumberForAgg(agg){
+  const combos = Object.values((agg&&agg.followersByProfilePlatform)||{});
+  if(!combos.length) return 0;
+  const profiles = Array.from(new Set(combos.map(c=>c.profile)));
+  const platforms = Array.from(new Set(combos.map(c=>c.platform)));
+  if(profiles.length<=1 && platforms.length<=1) return combos[0].value||0;
+  if(profiles.length===1 && platforms.length>1) return combos.reduce((a,c)=>a+(c.value||0),0);
+  return 0;
+}
+
+function buildExecIntelFacts(P){
+  const prev = execIntelPrevAgg();
+  return {
+    report_type: P.scope,
+    date_range: { from:P.date_from, to:P.date_to },
+    brands: P.profiles||[], platforms: P.platforms||[],
+    kpis: Object.assign({}, P.totals, { followers: followersNumberFor(P) }),
+    prev_kpis: prev ? Object.assign({}, prev.totals, { followers: execFollowersNumberForAgg(prev) }) : null,
+    platform_breakdown: P.byPlatform||[], brand_breakdown: P.byProfile||[],
+    brand_platform_breakdown: P.byProfilePlatform||[],
+    media_type_breakdown: Object.keys(P.mediaType||{}).map(k=>({
+      type:k, posts:(P.mediaType||{})[k]||0, engagement:(P.mediaTypeInteractions||{})[k]||0
+    })),
+    post_level_data: P.topPosts||[]
+  };
+}
+// Attaches the CURRENT-filter-derived effective scope onto the facts object itself so
+// callers/tests can read it directly rather than recomputing execEffectiveScope() -- kept
+// as a second step (not inlined into the object literal above) purely because it depends
+// on the facts object already existing (F.brands/F.platforms).
+function withEffectiveScope(F){ F.effective_scope = execEffectiveScope(F); return F; }
+
+// Shared shape for every candidate finding a rule below can emit -- this is what makes
+// INSIGHT -> EVIDENCE -> (optional) POSTS a uniform contract the renderer can trust,
+// instead of each rule inventing its own ad hoc fields.
+// Defensive cleanup applied to every generated string -- catches an accidental doubled
+// word (most commonly "total total X" when a template's own "total" combines with
+// metricLabel("engagement")/execEngLabel() already returning "Total Interactions") no
+// matter which rule produced it, rather than relying on every template being hand-audited.
+function execCleanupText(s){
+  if(typeof s !== "string") return s;
+  return s.replace(/\b(\w+)(\s+\1)+\b/gi, "$1");
+}
+function execFinding(o){
+  const f = Object.assign({ id:"", rule:"", headline:"", explanation:"", metrics:[], evidence:[],
+    implication:"", recommendation:null, risk:false, score:0, driverPosts:[],
+    driverPlatform:null, driverMediaType:null, driverBrand:null }, o);
+  f.headline = execCleanupText(f.headline);
+  f.explanation = execCleanupText(f.explanation);
+  f.implication = execCleanupText(f.implication);
+  f.recommendation = execCleanupText(f.recommendation);
+  f.evidence = (f.evidence||[]).map(execCleanupText);
+  f.metrics = (f.metrics||[]).map(m=> m ? Object.assign({}, m, {label: execCleanupText(m.label)}) : m);
+  return f;
+}
+
+function execEngLabel(){ return engagementMetricLabel().toLowerCase(); }
+
+// Report-type logic MUST follow the CURRENTLY selected global brand/platform filters, not
+// the report type declared back in the setup wizard -- so this is always recomputed from
+// F.brands/F.platforms (already filtered, since they come straight from
+// getActivePerformanceView()'s P.profiles/P.platforms) rather than read off the stale
+// P.scope/declared.scope. Narrowing the global filter down to one brand, for example,
+// must immediately turn off every multi-brand rule below, even if the export was
+// originally set up as Multiple Brands x Multiple Platforms.
+function execEffectiveScope(F){
+  const mb = (F.brands||[]).length>1, mp = (F.platforms||[]).length>1;
+  if(mb && mp) return "multi_brand_multi_platform";
+  if(mb) return "multi_brand_single_platform";
+  if(mp) return "single_brand_multi_platform";
+  return "single_brand_single_platform";
+}
+
+// Every insight must explicitly identify what it is talking about -- a reader should
+// never have to guess whether a pooled figure (posts/engagement totals, a spike, a
+// contradiction) covers one brand on one platform, one brand across several, several
+// brands on one platform, or everything selected at once. Rules that operate on the
+// pooled F.kpis (growth/decline, volume-vs-resonance, timeline spikes, cross-metric
+// contradictions) run across ANY of the four report types, so their headline/explanation
+// needs this clause prepended -- never a bare, scope-less sentence.
+function execScopeClause(F){
+  const mb = (F.brands||[]).length>1, mp = (F.platforms||[]).length>1;
+  const brand = (F.brands||[])[0], platform = (F.platforms||[])[0];
+  if(!mb && !mp) return brand&&platform ? `For ${esc(brand)} on ${platDisplay(platform)}, ` : "";
+  if(!mb && mp) return brand ? `Across ${esc(brand)}'s selected platforms, ` : "";
+  if(mb && !mp) return platform ? `Across the selected brands on ${platDisplay(platform)}, ` : "";
+  return "Across the selected brands and platforms, ";
+}
+// Applies execScopeClause() as a leading clause and lowercases the first letter of the
+// rest of the sentence so it reads as one continuous sentence rather than two independent
+// ones jammed together.
+function execScopedSentence(F, rest){
+  const clause = execScopeClause(F);
+  if(!clause) return rest;
+  return clause + rest.charAt(0).toLowerCase() + rest.slice(1);
+}
+
+// ---- RULE 1: volume without resonance --------------------------------------------
+function execRuleVolumeVsResonance(F){
+  const pk = F.prev_kpis; if(!pk || !pk.posts) return null;
+  const postsChg = pctChange(pk.posts, F.kpis.posts), engChg = pctChange(pk.engagement, F.kpis.engagement);
+  if(postsChg==null || engChg==null) return null;
+  if(!(postsChg>=10 && engChg<=-10)) return null;
+  return execFinding({
+    id:"volume_vs_resonance", rule:"R1",
+    headline: execScopedSentence(F, `Content output increased ${postsChg}% while ${execEngLabel()} declined ${Math.abs(engChg)}%`),
+    explanation: execScopedSentence(F, "The additional publishing volume did not translate into stronger audience response."),
+    metrics:[{label:"Posts", value:`${postsChg>0?"+":""}${postsChg}%`}, {label:metricLabel("engagement"), value:`${engChg}%`}],
+    evidence:[`Posts: ${fmt(pk.posts)} → ${fmt(F.kpis.posts)} (${postsChg>0?"+":""}${postsChg}%)`,
+      `${metricLabel("engagement")}: ${fmt(pk.engagement)} → ${fmt(F.kpis.engagement)} (${engChg}%)`],
+    implication:"Publishing more without a matching lift in response points to a content-mix or targeting issue, not a volume gap.",
+    recommendation:"Review the content characteristics of the previous period's stronger-performing posts before adding further publishing volume.",
+    risk:true, score: Math.abs(postsChg)+Math.abs(engChg)
+  });
+}
+
+// ---- RULE 2: engagement efficiency improvement -------------------------------------
+function execRuleEfficiencyImprovement(F){
+  const pk = F.prev_kpis; if(!pk || !pk.posts) return null;
+  const postsChg = pctChange(pk.posts, F.kpis.posts), engChg = pctChange(pk.engagement, F.kpis.engagement);
+  if(postsChg==null || engChg==null) return null;
+  if(!(engChg>=10 && postsChg<=0)) return null;
+  return execFinding({
+    id:"efficiency_improvement", rule:"R2",
+    headline: execScopedSentence(F, `${metricLabel("engagement")} grew ${engChg}% on ${postsChg}% ${postsChg<0?"less":"the same"} content`),
+    explanation: execScopedSentence(F, "Engagement efficiency improved, with stronger audience response generated from the same or lower content volume."),
+    metrics:[{label:"Posts", value:`${postsChg}%`}, {label:metricLabel("engagement"), value:`+${engChg}%`}],
+    evidence:[`Posts: ${fmt(pk.posts)} → ${fmt(F.kpis.posts)} (${postsChg}%)`,
+      `${metricLabel("engagement")}: ${fmt(pk.engagement)} → ${fmt(F.kpis.engagement)} (+${engChg}%)`],
+    implication:"The account is getting more out of each post rather than relying on higher volume.",
+    recommendation:"Identify what changed in the content mix this period and prioritize repeating it over increasing volume.",
+    score: Math.abs(engChg)+Math.abs(postsChg)
+  });
+}
+
+// ---- RULE 3: platform concentration -------------------------------------------------
+// Multiple Brands x Multiple Platforms is deliberately excluded here -- pooling every
+// brand into one "the account" figure is exactly the combined-account framing that report
+// type must never use (see execRuleBrandPlatformLeaders/execRuleBrandOwnPlatformConcentration
+// below, which analyze this at the correct Brand x Platform granularity instead).
+function execRulePlatformConcentration(F){
+  if(execEffectiveScope(F)==="multi_brand_multi_platform") return null;
+  if((F.platforms||[]).length<2 || !F.kpis.engagement || !F.kpis.posts) return null;
+  const sorted = [...F.platform_breakdown].sort((a,b)=>b.engagement-a.engagement);
+  const top = sorted[0]; if(!top) return null;
+  const share = Math.round((top.engagement/F.kpis.engagement)*1000)/10;
+  if(share<50) return null;
+  const postShare = Math.round((top.posts/F.kpis.posts)*1000)/10;
+  const brand = (F.brands||[])[0] || null;
+  const bposs = brand ? `${esc(brand)}'s ` : "";
+  const bits = brand ? "its " : "";
+  return execFinding({
+    id:"platform_concentration", rule:"R3",
+    headline:`${platDisplay(top.platform)} generated ${share}% of ${bposs}${execEngLabel()} from ${postShare}% of ${bits}posts, indicating substantially higher interaction efficiency`,
+    explanation:`${bposs||"Overall "}${execEngLabel()} is heavily concentrated on ${platDisplay(top.platform)}, making it ${brand?esc(brand)+"'s":"the account's"} primary driver of audience interaction.`,
+    metrics:[{label:"Share of "+execEngLabel(), value:share+"%"}, {label:"Share of posts", value:postShare+"%"}],
+    evidence:[`${platDisplay(top.platform)}: ${fmt(top.engagement)} of ${bposs}${fmt(F.kpis.engagement)} ${execEngLabel()} (${share}%), from ${fmt(top.posts)} of ${bits}${fmt(F.kpis.posts)} posts (${postShare}%)`],
+    implication: brand ? `${esc(brand)}'s overall performance is closely tied to ${platDisplay(top.platform)}'s results.` : "Overall performance is closely tied to this one platform's results.",
+    recommendation: share>=70 ? `Treat ${platDisplay(top.platform)} as ${brand?esc(brand)+"'s":"the"} primary channel for reporting and testing -- results elsewhere currently have limited influence on the total.` : null,
+    risk: share>=70, score: share, driverPlatform: top.platform, driverBrand: brand
+  });
+}
+
+// ---- RULES 4/5: weak / strong platforms ---------------------------------------------
+function execRuleWeakStrongPlatforms(F){
+  if(execEffectiveScope(F)==="multi_brand_multi_platform") return [];
+  if((F.platforms||[]).length<2 || !F.kpis.posts) return [];
+  // Recomputes the exact same "is this THE concentration platform" check
+  // execRulePlatformConcentration makes, purely so the "strong platform" branch below can
+  // skip that one platform -- its concentration finding already states both the
+  // engagement share and the post share together, so re-stating it here as a second
+  // "strong platform" finding would be the exact duplicate the dedup rule forbids.
+  const sortedByEng = [...F.platform_breakdown].sort((a,b)=>b.engagement-a.engagement);
+  const topByEng = sortedByEng[0];
+  const topShare = (topByEng && F.kpis.engagement) ? Math.round((topByEng.engagement/F.kpis.engagement)*1000)/10 : 0;
+  const concentrationPlatform = (topByEng && topShare>=50) ? topByEng.platform : null;
+  const brand = (F.brands||[])[0] || null;
+  const bposs = brand ? `${esc(brand)}'s ` : "";
+  const bits = brand ? "its " : "";
+  const out = [];
+  F.platform_breakdown.forEach(pf=>{
+    const postShare = Math.round((pf.posts/F.kpis.posts)*1000)/10;
+    const engShare = F.kpis.engagement ? Math.round((pf.engagement/F.kpis.engagement)*1000)/10 : 0;
+    const gap = Math.round((engShare-postShare)*10)/10;
+    if(postShare>=15 && gap<=-15){
+      out.push(execFinding({
+        id:"weak_platform_"+pf.platform, rule:"R4",
+        headline:`${platDisplay(pf.platform)} accounts for ${postShare}% of ${bits}posts but only ${engShare}% of ${bposs}${execEngLabel()}`,
+        explanation:`Indicates lower content efficiency on ${platDisplay(pf.platform)} relative to ${brand?esc(brand)+"'s":"the account's"} other platforms.`,
+        metrics:[{label:"Post share", value:postShare+"%"}, {label:execEngLabel()+" share", value:engShare+"%"}],
+        evidence:[`${platDisplay(pf.platform)}: ${fmt(pf.posts)} posts (${postShare}%), ${fmt(pf.engagement)} ${execEngLabel()} (${engShare}%)`],
+        implication:"Content volume on this platform is not converting into proportional audience response.",
+        recommendation:`Review ${platDisplay(pf.platform)}'s content mix and publishing allocation before increasing volume there.`,
+        risk:true, score:Math.abs(gap), driverPlatform: pf.platform, driverBrand: brand
+      }));
+    } else if(gap>=15){
+      if(pf.platform===concentrationPlatform) return; // already fully covered by execRulePlatformConcentration's own merged finding
+      out.push(execFinding({
+        id:"strong_platform_"+pf.platform, rule:"R5",
+        headline:`${platDisplay(pf.platform)} generates ${engShare}% of ${bposs}${execEngLabel()} from ${postShare}% of ${bits}posts`,
+        explanation:`Indicates above-average engagement efficiency on ${platDisplay(pf.platform)}${brand?" for "+esc(brand):""}.`,
+        metrics:[{label:"Post share", value:postShare+"%"}, {label:execEngLabel()+" share", value:engShare+"%"}],
+        evidence:[`${platDisplay(pf.platform)}: ${fmt(pf.posts)} posts (${postShare}%), ${fmt(pf.engagement)} ${execEngLabel()} (${engShare}%)`],
+        implication: brand ? `${platDisplay(pf.platform)} converts ${esc(brand)}'s content into audience response more efficiently than its account average.` : "This platform converts content into audience response more efficiently than the account average.",
+        recommendation:`Examine ${platDisplay(pf.platform)}'s strongest-performing content before increasing overall publishing volume elsewhere.`,
+        score:gap, driverPlatform: pf.platform, driverBrand: brand
+      }));
+    }
+  });
+  return out;
+}
+
+// ---- RULE 6: brand comparison (scale vs efficiency) ----------------------------------
+function execRuleBrandComparison(F){
+  if((F.brands||[]).length<2) return [];
+  const rows = F.brand_breakdown.map(b=>({ profile:b.profile, posts:b.posts, engagement:b.engagement,
+    perPost: b.posts?b.engagement/b.posts:0 }));
+  if(!rows.length) return [];
+  const out = [];
+  const byScale = [...rows].sort((a,b)=>b.engagement-a.engagement);
+  const byEff = [...rows].sort((a,b)=>b.perPost-a.perPost);
+  const scaleLeader = byScale[0], effLeader = byEff[0];
+  if(scaleLeader.profile!==effLeader.profile && effLeader.perPost>0){
+    out.push(execFinding({
+      id:"brand_scale_vs_efficiency", rule:"R6",
+      headline:`${esc(scaleLeader.profile)} leads on ${execEngLabel()}, but ${esc(effLeader.profile)} leads on efficiency`,
+      explanation:`${esc(scaleLeader.profile)} leads on ${execEngLabel()}, but ${esc(effLeader.profile)} has the highest ${execEngLabel()} per post, indicating stronger audience efficiency despite its smaller scale.`,
+      metrics:[{label:esc(scaleLeader.profile)+" total", value:fmt(scaleLeader.engagement)}, {label:esc(effLeader.profile)+" per post", value:fmt(Math.round(effLeader.perPost))}],
+      evidence:[`${esc(scaleLeader.profile)}: ${fmt(scaleLeader.engagement)} total ${execEngLabel()} from ${fmt(scaleLeader.posts)} posts`,
+        `${esc(effLeader.profile)}: ${fmt(Math.round(effLeader.perPost))} ${execEngLabel()} per post from ${fmt(effLeader.posts)} posts`],
+      implication:"Scale and efficiency are led by different brands here, so ranking by total volume alone would understate one brand's per-post performance.",
+      score:20, driverBrand: effLeader.profile
+    }));
+  } else {
+    out.push(execFinding({
+      id:"brand_scale_leader", rule:"R6",
+      headline:`${esc(byScale[0].profile)} is the strongest performer on both ${execEngLabel()} and efficiency`,
+      explanation:`${esc(byScale[0].profile)} leads on both scale and per-post efficiency among the compared brands.`,
+      metrics:[{label:"Total", value:fmt(byScale[0].engagement)}, {label:"Per post", value:fmt(Math.round(byScale[0].perPost))}],
+      evidence:[`${esc(byScale[0].profile)}: ${fmt(byScale[0].engagement)} total ${execEngLabel()}, ${fmt(Math.round(byScale[0].perPost))} per post from ${fmt(byScale[0].posts)} posts`],
+      implication:"No scale/efficiency trade-off among the compared brands in this period.",
+      score:8, driverBrand: byScale[0].profile
+    }));
+  }
+  if(rows.length>2){
+    const weakest = [...rows].sort((a,b)=>a.perPost-b.perPost)[0];
+    if(weakest.profile!==effLeader.profile){
+      out.push(execFinding({
+        id:"brand_weakest_"+weakest.profile, rule:"R6",
+        headline:`${esc(weakest.profile)} has the lowest ${execEngLabel()} per post among the compared brands`,
+        explanation:`${esc(weakest.profile)} converts posting volume into audience response least efficiently of the compared brands.`,
+        metrics:[{label:"Per post", value:fmt(Math.round(weakest.perPost))}],
+        evidence:[`${esc(weakest.profile)}: ${fmt(Math.round(weakest.perPost))} ${execEngLabel()} per post from ${fmt(weakest.posts)} posts`],
+        implication:"This brand is the weakest performer by efficiency in the comparison set.",
+        risk:true, score:10, driverBrand: weakest.profile
+      }));
+    }
+  }
+  return out;
+}
+
+// ---- RULE 11: Brand x Platform analysis (Multiple Brands x Multiple Platforms ONLY) ----
+// This whole family only ever runs when execEffectiveScope(F) is
+// "multi_brand_multi_platform" -- i.e. AFTER the current global brand/platform filters are
+// applied, not the originally-declared report type. It replaces Rules 3/4/5's pooled
+// "the account" framing (wrong once more than one brand is in scope) with the
+// Brand -> Platform -> Performance structure the request calls for, reusing
+// F.brand_platform_breakdown (P.byProfilePlatform, already computed -- no new aggregation).
+
+// 11a: for each platform, who leads on total volume and who leads on per-post efficiency.
+function execRuleBrandPlatformLeaders(F){
+  if(execEffectiveScope(F)!=="multi_brand_multi_platform") return [];
+  const out = [];
+  (F.platforms||[]).forEach(pf=>{
+    const combos = (F.brand_platform_breakdown||[]).filter(c=>c.platform===pf && c.posts>0 && c.engagement>0);
+    if(combos.length<2) return;
+    const withEff = combos.map(c=>({ profile:c.profile, posts:c.posts, engagement:c.engagement, perPost: c.posts?c.engagement/c.posts:0 }));
+    const byScale = [...withEff].sort((a,b)=>b.engagement-a.engagement);
+    const byEff = [...withEff].sort((a,b)=>b.perPost-a.perPost);
+    const scaleLeader = byScale[0], effLeader = byEff[0];
+    if(scaleLeader.profile!==effLeader.profile && effLeader.perPost>0){
+      out.push(execFinding({
+        id:"bp_leader_"+pf, rule:"R11",
+        headline:`On ${platDisplay(pf)}, ${esc(scaleLeader.profile)} generated the most ${execEngLabel()}, while ${esc(effLeader.profile)} had the strongest ${execEngLabel()} per post`,
+        explanation:`Among the brands active on ${platDisplay(pf)}, ${esc(scaleLeader.profile)} leads on scale while ${esc(effLeader.profile)} leads on per-post efficiency.`,
+        metrics:[{label:esc(scaleLeader.profile)+" total", value:fmt(scaleLeader.engagement)}, {label:esc(effLeader.profile)+" per post", value:fmt(Math.round(effLeader.perPost))}],
+        evidence:[`${esc(scaleLeader.profile)} on ${platDisplay(pf)}: ${fmt(scaleLeader.engagement)} ${execEngLabel()} from ${fmt(scaleLeader.posts)} posts`,
+          `${esc(effLeader.profile)} on ${platDisplay(pf)}: ${fmt(Math.round(effLeader.perPost))} ${execEngLabel()} per post from ${fmt(effLeader.posts)} posts`],
+        implication:`Brand performance on ${platDisplay(pf)} splits between scale and efficiency leadership -- ranking by volume alone would miss ${esc(effLeader.profile)}'s per-post strength.`,
+        score: 70, driverPlatform: pf
+      }));
+    } else {
+      out.push(execFinding({
+        id:"bp_leader_"+pf, rule:"R11",
+        headline:`On ${platDisplay(pf)}, ${esc(scaleLeader.profile)} generated the most ${execEngLabel()} among the compared brands`,
+        explanation:`${esc(scaleLeader.profile)} leads both total ${execEngLabel()} and per-post efficiency on ${platDisplay(pf)}.`,
+        metrics:[{label:"Total", value:fmt(scaleLeader.engagement)}, {label:"Per post", value:fmt(Math.round(scaleLeader.perPost))}],
+        evidence:[`${esc(scaleLeader.profile)} on ${platDisplay(pf)}: ${fmt(scaleLeader.engagement)} ${execEngLabel()} from ${fmt(scaleLeader.posts)} posts`],
+        implication:`${esc(scaleLeader.profile)} is the clear leader on ${platDisplay(pf)}.`,
+        score: 55, driverPlatform: pf
+      }));
+    }
+  });
+  return out;
+}
+
+// 11b: is a brand's OWN performance concentrated on one of its OWN platforms.
+function execRuleBrandOwnPlatformConcentration(F){
+  if(execEffectiveScope(F)!=="multi_brand_multi_platform") return [];
+  const out = [];
+  (F.brands||[]).forEach(brand=>{
+    const combos = (F.brand_platform_breakdown||[]).filter(c=>c.profile===brand && c.posts>0);
+    const brandTotal = combos.reduce((a,c)=>a+(c.engagement||0),0);
+    if(combos.length<2 || !brandTotal) return;
+    const sorted = [...combos].sort((a,b)=>b.engagement-a.engagement);
+    const top = sorted[0];
+    const share = Math.round((top.engagement/brandTotal)*1000)/10;
+    if(share<60) return;
+    out.push(execFinding({
+      id:"bp_concentration_"+brand, rule:"R11",
+      headline:`${esc(brand)}'s performance is concentrated on ${platDisplay(top.platform)}`,
+      explanation:`${esc(brand)} generates ${share}% of its own ${execEngLabel()} on ${platDisplay(top.platform)}, making it ${esc(brand)}'s primary channel.`,
+      metrics:[{label:"Share of "+esc(brand)+"'s own "+execEngLabel(), value:share+"%"}],
+      evidence:[`${esc(brand)} on ${platDisplay(top.platform)}: ${fmt(top.engagement)} of ${esc(brand)}'s own ${fmt(brandTotal)} ${execEngLabel()} (${share}%)`],
+      implication:`${esc(brand)}'s overall results are driven largely by ${platDisplay(top.platform)} rather than spread evenly across its platforms.`,
+      score: Math.min(75, share*0.8), driverBrand: brand, driverPlatform: top.platform
+    }));
+  });
+  return out;
+}
+
+// 11c: for a given brand, is its best platform substantially stronger than its worst.
+function execRuleBrandPlatformGap(F){
+  if(execEffectiveScope(F)!=="multi_brand_multi_platform") return [];
+  const out = [];
+  (F.brands||[]).forEach(brand=>{
+    const combos = (F.brand_platform_breakdown||[]).filter(c=>c.profile===brand && c.posts>0);
+    if(combos.length<2) return;
+    const withEff = combos.map(c=>({ platform:c.platform, posts:c.posts, engagement:c.engagement, perPost: c.posts?c.engagement/c.posts:0 }));
+    const sorted = [...withEff].sort((a,b)=>b.perPost-a.perPost);
+    const best = sorted[0], worst = sorted[sorted.length-1];
+    if(!best || !worst || best.platform===worst.platform || worst.perPost<=0) return;
+    const multiple = Math.round((best.perPost/worst.perPost)*10)/10;
+    if(multiple<2) return;
+    out.push(execFinding({
+      id:"bp_gap_"+brand, rule:"R11",
+      headline:`${esc(brand)}'s ${platDisplay(best.platform)} performance substantially exceeded its ${platDisplay(worst.platform)} performance`,
+      explanation:`${esc(brand)} generates ${fmt(Math.round(best.perPost))} ${execEngLabel()} per post on ${platDisplay(best.platform)}, versus ${fmt(Math.round(worst.perPost))} on ${platDisplay(worst.platform)} -- a ${multiple}× difference.`,
+      metrics:[{label:platDisplay(best.platform)+" per post", value:fmt(Math.round(best.perPost))}, {label:platDisplay(worst.platform)+" per post", value:fmt(Math.round(worst.perPost))}],
+      evidence:[`${esc(brand)} on ${platDisplay(best.platform)}: ${fmt(Math.round(best.perPost))} ${execEngLabel()} per post from ${fmt(best.posts)} posts`,
+        `${esc(brand)} on ${platDisplay(worst.platform)}: ${fmt(Math.round(worst.perPost))} ${execEngLabel()} per post from ${fmt(worst.posts)} posts`],
+      implication:`${platDisplay(best.platform)} is ${esc(brand)}'s stronger channel by a wide margin, making it ${esc(brand)}'s primary interaction channel.`,
+      recommendation:`Prioritize ${esc(brand)}'s ${platDisplay(best.platform)} content approach before investing further in its ${platDisplay(worst.platform)} presence.`,
+      score: Math.min(80, multiple*10), driverBrand: brand, driverPlatform: best.platform
+    }));
+  });
+  return out;
+}
+
+// 11d: on a single platform, does one brand out-convert another despite fewer posts.
+function execRuleCrossBrandPlatformEfficiency(F){
+  if(execEffectiveScope(F)!=="multi_brand_multi_platform") return [];
+  const out = [];
+  (F.platforms||[]).forEach(pf=>{
+    const combos = (F.brand_platform_breakdown||[]).filter(c=>c.platform===pf && c.posts>0);
+    if(combos.length<2) return;
+    const sorted = [...combos].sort((a,b)=>b.engagement-a.engagement);
+    const a = sorted[0], b = sorted[1];
+    if(!a || !b || a.engagement<=b.engagement || a.posts>=b.posts) return;
+    out.push(execFinding({
+      id:"bp_efficiency_inversion_"+pf+"_"+a.profile, rule:"R11",
+      headline:`${esc(a.profile)} generated more ${execEngLabel()} than ${esc(b.profile)} on ${platDisplay(pf)} despite publishing fewer posts`,
+      explanation:`On ${platDisplay(pf)}, ${esc(a.profile)} generated ${fmt(a.engagement)} ${execEngLabel()} from ${fmt(a.posts)} posts, versus ${esc(b.profile)}'s ${fmt(b.engagement)} from ${fmt(b.posts)} posts -- indicating stronger interaction efficiency for ${esc(a.profile)} on this platform.`,
+      metrics:[{label:esc(a.profile)+" posts", value:fmt(a.posts)}, {label:esc(b.profile)+" posts", value:fmt(b.posts)}],
+      evidence:[`${esc(a.profile)} on ${platDisplay(pf)}: ${fmt(a.engagement)} ${execEngLabel()} from ${fmt(a.posts)} posts`,
+        `${esc(b.profile)} on ${platDisplay(pf)}: ${fmt(b.engagement)} ${execEngLabel()} from ${fmt(b.posts)} posts`],
+      implication:`${esc(a.profile)} converts ${platDisplay(pf)} content into ${execEngLabel()} more efficiently than ${esc(b.profile)}.`,
+      score: 60, driverBrand: a.profile, driverPlatform: pf
+    }));
+  });
+  return out;
+}
+
+// Several Rule 11 (Brand x Platform) findings can independently land on the SAME
+// (brand, platform) pair -- e.g. 11b ("Ithraa's performance is concentrated on
+// Instagram") and 11c ("Ithraa's Instagram substantially exceeds its worst platform")
+// both name Ithraa + Instagram when that platform happens to be both the brand's
+// top-total and top-efficiency channel. Left alone these read as near-duplicate findings
+// (the exact pattern flagged in the spec: two statements about the same entity that
+// should be one). This merges any such group into a single finding: the highest-scored
+// member supplies the headline/explanation/implication/recommendation, and every other
+// member in the group contributes its evidence bullets and metrics rather than being
+// dropped, so no supporting detail is lost -- only the redundant restatement is.
+function execMergeSameEntityFindings(candidates){
+  // Only 11b (a brand's own-platform concentration) and 11c (that brand's best-vs-worst
+  // platform gap) are merge candidates -- both are, at bottom, restating "this platform is
+  // this brand's dominant one" from two angles. 11a (per-platform leader, no single brand
+  // owns it) and 11d (a genuine BETWEEN-brand comparison) are never folded in here even when
+  // they share the same (brand, platform) key, because they carry a materially different
+  // comparison (platform-vs-platform for 11a, brand-vs-brand for 11d) that would be lost.
+  const mergeable = id => !!id && (id.indexOf("bp_concentration_")===0 || id.indexOf("bp_gap_")===0);
+  const groups = {};
+  const rest = [];
+  candidates.forEach(c=>{
+    if(c && c.rule==="R11" && c.driverBrand && c.driverPlatform && mergeable(c.id)){
+      const key = c.driverBrand+"||"+c.driverPlatform;
+      (groups[key]=groups[key]||[]).push(c);
+    } else {
+      rest.push(c);
+    }
+  });
+  Object.values(groups).forEach(group=>{
+    if(group.length===1){ rest.push(group[0]); return; }
+    const sorted = [...group].sort((a,b)=>b.score-a.score);
+    const base = sorted[0];
+    sorted.slice(1).forEach(other=>{
+      (other.evidence||[]).forEach(e=>{ if(!base.evidence.includes(e)) base.evidence.push(e); });
+      (other.metrics||[]).forEach(m=>{ if(!base.metrics.some(bm=>bm.label===m.label)) base.metrics.push(m); });
+      if(!base.recommendation && other.recommendation) base.recommendation = other.recommendation;
+    });
+    rest.push(base);
+  });
+  return rest;
+}
+
+// ---- RULE 7: growth vs decline (period over period) ----------------------------------
+function execRuleGrowthDecline(F){
+  const pk = F.prev_kpis; if(!pk) return [];
+  const out = [];
+  ["reach","impressions","video_views"].forEach(key=>{
+    if(!pk[key]) return;
+    const chg = pctChange(pk[key], F.kpis[key]);
+    if(chg==null || Math.abs(chg)<15) return;
+    out.push(execFinding({
+      id:"growth_"+key, rule:"R7",
+      headline: execScopedSentence(F, `${metricLabel(key)} ${chg>0?"increased":"decreased"} ${Math.abs(chg)}% vs the previous period`),
+      explanation: execScopedSentence(F, `${metricLabel(key)} moved from ${fmt(pk[key])} to ${fmt(F.kpis[key])}.`),
+      metrics:[{label:metricLabel(key)+" change", value:`${chg>0?"+":""}${chg}%`}],
+      evidence:[`${metricLabel(key)}: ${fmt(pk[key])} → ${fmt(F.kpis[key])} (${chg>0?"+":""}${chg}%)`],
+      implication: chg<0 ? `${metricLabel(key)} declined meaningfully period over period.` : `${metricLabel(key)} grew meaningfully period over period.`,
+      risk: chg<0, score: Math.abs(chg)
+    }));
+  });
+  if(pk.followers){
+    const fChg = pctChange(pk.followers, F.kpis.followers);
+    if(fChg!=null && Math.abs(fChg)>=3){
+      out.push(execFinding({
+        id:"growth_followers", rule:"R7",
+        headline: execScopedSentence(F, `Followers ${fChg>0?"grew":"declined"} ${Math.abs(fChg)}% vs the previous period`),
+        explanation: execScopedSentence(F, `Followers moved from ${fmt(pk.followers)} to ${fmt(F.kpis.followers)}.`),
+        metrics:[{label:"Followers change", value:`${fChg>0?"+":""}${fChg}%`}],
+        evidence:[`Followers: ${fmt(pk.followers)} → ${fmt(F.kpis.followers)} (${fChg>0?"+":""}${fChg}%)`],
+        implication: fChg<0 ? "Audience size contracted period over period." : "Audience size grew period over period.",
+        risk: fChg<0, score: Math.abs(fChg)*2
+      }));
+    }
+  }
+  return out;
+}
+
+// ---- RULE 8: media type outperformance -------------------------------------------------
+// Media type MUST always carry an explicit Brand and/or Platform scope -- "Carousel
+// outperforms the account average" is meaningless once more than one brand or platform is
+// in view, because the reader can't tell which brand's which platform it refers to. This
+// groups F.post_level_data into the right set of Brand x Platform buckets for whichever
+// report type is active (a single bucket for One Brand x One Platform, one bucket PER
+// PLATFORM for One Brand x Many Platforms, one bucket PER BRAND for Many Brands x One
+// Platform, and one bucket per Brand x Platform COMBINATION for Many Brands x Many
+// Platforms) so every resulting finding's own average is computed against the right
+// baseline -- that combination's own average, never a pooled account-wide figure that
+// blends brands/platforms the finding isn't actually about.
+function execMediaTypeGroups(F){
+  const scope = execEffectiveScope(F);
+  const posts = F.post_level_data||[];
+  const brand0 = (F.brands||[])[0]||null, platform0 = (F.platforms||[])[0]||null;
+  if(scope==="single_brand_single_platform") return [{ brand:brand0, platform:platform0, posts }];
+  if(scope==="single_brand_multi_platform") return (F.platforms||[]).map(pf=>({ brand:brand0, platform:pf, posts: posts.filter(p=>p.platform===pf) }));
+  if(scope==="multi_brand_single_platform") return (F.brands||[]).map(b=>({ brand:b, platform:platform0, posts: posts.filter(p=>p.profile===b) }));
+  const groups = [];
+  (F.brands||[]).forEach(b=>{
+    (F.platforms||[]).forEach(pf=>{
+      groups.push({ brand:b, platform:pf, posts: posts.filter(p=>p.profile===b && p.platform===pf) });
+    });
+  });
+  return groups;
+}
+// Builds the exact phrasing the request's examples use: "Ithraa's Instagram" when both a
+// brand and a platform anchor the group, falling back gracefully if either is missing
+// (shouldn't happen given execMediaTypeGroups() above, but kept defensive).
+function execGroupScopeLabel(brand, platform){
+  if(brand && platform) return { subject:`${esc(brand)}'s ${platDisplay(platform)}`, avg:platDisplay(platform), owner:`${esc(brand)}'s` };
+  if(brand) return { subject:`${esc(brand)}'s`, avg:`${esc(brand)}'s account`, owner:`${esc(brand)}'s` };
+  if(platform) return { subject:platDisplay(platform), avg:platDisplay(platform), owner:`${platDisplay(platform)}'s` };
+  return { subject:"The account's", avg:"the account", owner:"the account's" };
+}
+function execRuleMediaType(F){
+  const out = [];
+  execMediaTypeGroups(F).forEach(g=>{
+    const posts = g.posts||[];
+    if(posts.length<4) return; // avoid drawing a format conclusion from a tiny sample
+    const counts = {}, engs = {};
+    posts.forEach(p=>{
+      const mt = p.media_type; if(!mt || mt==="Unknown") return;
+      counts[mt] = (counts[mt]||0)+1;
+      engs[mt] = (engs[mt]||0)+(p.engagement||0);
+    });
+    const entries = Object.keys(counts).map(k=>({ type:k, posts:counts[k], engagement:engs[k], avgPerPost: counts[k]?engs[k]/counts[k]:0 }));
+    if(entries.length<2) return;
+    const totalPosts = posts.length, totalEng = posts.reduce((a,p)=>a+(p.engagement||0),0);
+    if(!totalPosts || !totalEng) return;
+    const groupAvg = totalEng/totalPosts;
+    if(!groupAvg) return;
+    const best = [...entries].sort((a,b)=>b.avgPerPost-a.avgPerPost)[0];
+    if(!best || best.avgPerPost < groupAvg*1.3) return;
+    const multiple = Math.round((best.avgPerPost/groupAvg)*10)/10;
+    const label = execGroupScopeLabel(g.brand, g.platform);
+    out.push(execFinding({
+      id:"media_type_"+(g.brand||"all")+"_"+(g.platform||"all")+"_"+best.type,
+      rule:"R8",
+      headline:`${label.subject} ${cap(best.type)} posts generated ${multiple}× the ${label.avg} average ${execEngLabel()} per post`,
+      explanation:`${label.subject} ${cap(best.type)} posts averaged ${fmt(Math.round(best.avgPerPost))} ${execEngLabel()} per post, compared with ${fmt(Math.round(groupAvg))} for ${label.avg}.`,
+      metrics:[{label:cap(best.type)+" avg/post", value:fmt(Math.round(best.avgPerPost))}, {label:label.avg+" avg/post", value:fmt(Math.round(groupAvg))}],
+      evidence:[`${label.subject} ${cap(best.type)}: ${fmt(best.posts)} posts, ${fmt(best.engagement)} total ${execEngLabel()}, ${fmt(Math.round(best.avgPerPost))} per post`,
+        `${label.avg} average: ${fmt(Math.round(groupAvg))} ${execEngLabel()} per post`],
+      implication:`${cap(best.type)} is ${label.owner} strongest-performing format in the period.`,
+      recommendation:`Increase the share of ${cap(best.type).toLowerCase()} content within ${label.owner} content mix, and examine its strongest-performing examples before increasing overall publishing volume.`,
+      score: multiple*10, driverMediaType: best.type, driverBrand: g.brand||null, driverPlatform: g.platform||null
+    }));
+  });
+  return out;
+}
+
+// ---- RULE 9: timeline consistency vs a single-day spike -------------------------------
+function execRuleTimelinePattern(F, P){
+  const daily = P.dailyInteractionsTotal||{};
+  const days = Object.keys(daily).sort();
+  if(days.length<5) return null;
+  const values = days.map(d=>daily[d]);
+  const total = values.reduce((a,b)=>a+b,0);
+  if(!total) return null;
+  const mean = total/values.length;
+  if(!mean) return null;
+  let maxIdx=0; values.forEach((v,i)=>{ if(v>values[maxIdx]) maxIdx=i; });
+  const maxVal = values[maxIdx], maxDay = days[maxIdx];
+  const shareOfTotal = Math.round((maxVal/total)*1000)/10;
+  if(!(maxVal>=mean*3 && shareOfTotal>=20)) return null;
+  return execFinding({
+    id:"timeline_spike", rule:"R9",
+    headline: execScopedSentence(F, `${formatDatePretty(maxDay)} produced a disproportionate share of period ${execEngLabel()}`),
+    explanation: execScopedSentence(F, `This single day generated ${shareOfTotal}% of the period's total ${execEngLabel()}, well above the ${fmt(Math.round(mean))} daily average.`),
+    metrics:[{label:"Peak day", value:fmt(maxVal)}, {label:"Daily average", value:fmt(Math.round(mean))}],
+    evidence:[`${formatDatePretty(maxDay)}: ${fmt(maxVal)} ${execEngLabel()} vs a ${fmt(Math.round(mean))} daily average across the period`],
+    implication:"Results for the period are concentrated in a single spike rather than spread across sustained performance.",
+    score: Math.min(100, Math.round(maxVal/mean)*5),
+    driverDate: maxDay
+  });
+}
+
+// ---- RULE 10: cross-metric contradictions ----------------------------------------------
+function execRuleContradictions(F){
+  const pk = F.prev_kpis; if(!pk) return [];
+  const out = [];
+  const reachChg = pk.reach ? pctChange(pk.reach, F.kpis.reach) : null;
+  const engChg = pk.engagement ? pctChange(pk.engagement, F.kpis.engagement) : null;
+  const followersChg = pk.followers ? pctChange(pk.followers, F.kpis.followers) : null;
+  const vvChg = pk.video_views ? pctChange(pk.video_views, F.kpis.video_views) : null;
+  function add(idSuffix, aLabel, aChg, bLabel, bChg, minMag){
+    if(aChg==null||bChg==null) return;
+    if(aChg>=minMag && bChg<=-minMag){
+      out.push(execFinding({
+        id:"contradiction_"+idSuffix, rule:"R10",
+        headline: execScopedSentence(F, `${aLabel} rose ${aChg}% while ${bLabel.toLowerCase()} fell ${Math.abs(bChg)}%`),
+        explanation: execScopedSentence(F, `${aLabel} and ${bLabel.toLowerCase()} moved in opposite directions, which is often more informative than either metric moving alone.`),
+        metrics:[{label:aLabel+" change", value:`+${aChg}%`}, {label:bLabel+" change", value:`${bChg}%`}],
+        evidence:[`${aLabel}: +${aChg}%`, `${bLabel}: ${bChg}%`],
+        implication:`Growth in ${aLabel.toLowerCase()} is not currently converting into ${bLabel.toLowerCase()}.`,
+        risk:true, score: Math.abs(aChg)+Math.abs(bChg)
+      }));
+    }
+  }
+  add("reach_engagement","Reach",reachChg,metricLabel("engagement"),engChg,10);
+  add("followers_engagement","Followers",followersChg,metricLabel("engagement"),engChg,5);
+  add("views_engagement","Video views",vvChg,metricLabel("engagement"),engChg,10);
+  return out;
+}
+
+// Whenever a finding names a specific driving platform or media type, this attaches the
+// actual posts behind it -- date, caption, media type, platform, engagement, and a
+// clickable permalink when the export has one. Never invents a URL: a post with no
+// permalink says so explicitly (rendered in execFindingCardHTML) rather than being hidden
+// or getting a fabricated link. Comparisons are always against the right baseline (the
+// same platform/media-type group's own average, and the account average) rather than a
+// bare "biggest number wins" pick.
+function execIdentifyDriverPosts(finding, P){
+  if(!finding || (!finding.driverPlatform && !finding.driverMediaType && !finding.driverBrand && !finding.driverDate)) return finding;
+  const posts = P.topPosts||[];
+  if(!posts.length) return finding;
+  let pool = posts;
+  if(finding.driverBrand) pool = pool.filter(p=>p.profile===finding.driverBrand);
+  if(finding.driverPlatform) pool = pool.filter(p=>p.platform===finding.driverPlatform);
+  if(finding.driverMediaType) pool = pool.filter(p=>p.media_type===finding.driverMediaType);
+  if(finding.driverDate) pool = pool.filter(p=>p.date && String(p.date).slice(0,10)===String(finding.driverDate).slice(0,10));
+  if(!pool.length) return finding;
+  pool = [...pool].sort((a,b)=>(b.engagement||0)-(a.engagement||0));
+  const groupAvg = pool.reduce((a,p)=>a+(p.engagement||0),0)/pool.length;
+  const accountAvg = posts.reduce((a,p)=>a+(p.engagement||0),0)/posts.length;
+  const top = pool.slice(0,3).map(p=>({
+    date:p.date, caption:p.caption, permalink:p.permalink||null, platform:p.platform, media_type:p.media_type,
+    profile:p.profile, engagement:p.engagement,
+    vsGroupAvg: groupAvg?Math.round((p.engagement/groupAvg)*10)/10:null,
+    vsAccountAvg: accountAvg?Math.round((p.engagement/accountAvg)*10)/10:null
+  }));
+  finding.driverPosts = top;
+  if(top.length && F_totalEngagementSafe(P)){
+    const share = Math.round((top.reduce((a,p)=>a+(p.engagement||0),0)/P.totals.engagement)*1000)/10;
+    const groupLabelParts = [];
+    if(finding.driverBrand) groupLabelParts.push(esc(finding.driverBrand));
+    if(finding.driverPlatform) groupLabelParts.push(platDisplay(finding.driverPlatform));
+    if(finding.driverMediaType) groupLabelParts.push(cap(finding.driverMediaType));
+    if(finding.driverDate) groupLabelParts.push(formatDatePretty(finding.driverDate));
+    const groupLabel = groupLabelParts.join(" / ") || "top";
+    const postShareOfPosts = Math.round((pool.length/posts.length)*1000)/10;
+    finding.evidence.push(execCleanupText(`Top ${top.length} ${groupLabel} post${top.length>1?"s":""} contributed ${share}% of ${execEngLabel()} while representing ${postShareOfPosts}% of posts.`));
+  }
+  return finding;
+}
+function F_totalEngagementSafe(P){ return P && P.totals && P.totals.engagement; }
+
+// Orchestrator: run every rule, attach driver-post evidence, de-dupe (a rule can only fire
+// once per id even across near-identical inputs), score, and cap at a reviewable number of
+// findings -- "generate many candidates internally, show only the highest-value ones", not
+// a wall of 30-50 observations.
+function computeExecutiveFindings(P){
+  const F = withEffectiveScope(buildExecIntelFacts(P));
+  let candidates = [];
+  const push = (x)=>{ if(x) candidates.push(x); };
+  const pushAll = (arr)=>{ (arr||[]).forEach(push); };
+
+  push(execRuleVolumeVsResonance(F));
+  push(execRuleEfficiencyImprovement(F));
+  push(execRulePlatformConcentration(F));
+  pushAll(execRuleWeakStrongPlatforms(F));
+  pushAll(execRuleBrandComparison(F));
+  // Rule 11 (Brand x Platform) only ever produces candidates when F.effective_scope is
+  // "multi_brand_multi_platform" (checked inside each rule) -- this is the report type
+  // that must analyze Brand x Platform combinations directly instead of pooling every
+  // brand into Rules 3/4/5's combined-account view (which gate themselves OFF for this
+  // exact scope, see their own comments). A flat priority boost keeps these findings from
+  // being drowned out by generic trend/contradiction findings, per the explicit
+  // "MANY-BRAND x MANY-PLATFORM PRIORITY" ordering (brand x platform differences first).
+  const R11_PRIORITY_BOOST = 40;
+  pushAll(execRuleBrandPlatformLeaders(F).map(f=>{ if(f) f.score += R11_PRIORITY_BOOST; return f; }));
+  pushAll(execRuleBrandOwnPlatformConcentration(F).map(f=>{ if(f) f.score += R11_PRIORITY_BOOST; return f; }));
+  pushAll(execRuleBrandPlatformGap(F).map(f=>{ if(f) f.score += R11_PRIORITY_BOOST; return f; }));
+  pushAll(execRuleCrossBrandPlatformEfficiency(F).map(f=>{ if(f) f.score += R11_PRIORITY_BOOST; return f; }));
+  pushAll(execRuleGrowthDecline(F));
+  pushAll(execRuleContradictions(F));
+  pushAll(execRuleMediaType(F));
+  push(execRuleTimelinePattern(F, P));
+
+  candidates = candidates.filter(Boolean);
+  candidates = execMergeSameEntityFindings(candidates);
+  candidates.forEach(c=>execIdentifyDriverPosts(c, P));
+
+  const byId = {};
+  candidates.forEach(c=>{ if(!byId[c.id] || c.score>byId[c.id].score) byId[c.id]=c; });
+  const deduped = Object.values(byId).sort((a,b)=>b.score-a.score);
+
+  return { facts:F, findings: deduped.slice(0,8), candidateCount: deduped.length };
+}
+
+// ---- rendering --------------------------------------------------------------------------
+function execFindingCardHTML(f, idx){
+  const metricsHtml = (f.metrics||[]).map(m=>`<div class="intel-finding-metric"><div class="v">${esc(String(m.value))}</div><div class="l">${esc(m.label)}</div></div>`).join("");
+  const evidenceHtml = (f.evidence||[]).map(e=>`<li>${esc(e)}</li>`).join("");
+  const driverPostsHtml = (f.driverPosts&&f.driverPosts.length) ? `
+    <div class="intel-driver-posts">
+      <div class="intel-driver-posts-title">Supporting posts</div>
+      ${f.driverPosts.map(p=>`
+        <div class="intel-post-card">
+          <div class="n">${platformIconHTML(p.platform)} ${esc(platDisplay(p.platform))} &middot; ${esc(cap(p.media_type||"Unknown"))} &middot; ${p.date?formatDatePretty(p.date):"date unknown"}</div>
+          <div class="intel-post-text" dir="auto">${p.permalink?`<a href="${esc(p.permalink)}" target="_blank" rel="noopener">${esc(String(p.caption||"(no caption)").slice(0,180))}</a>`:esc(String(p.caption||"(no caption)").slice(0,180))}</div>
+          <div class="intel-post-stats">
+            <span><b style="color:#fff">${fmt(p.engagement)}</b> ${esc(execEngLabel())}</span>
+            ${p.vsGroupAvg!=null?`<span>${p.vsGroupAvg}× the group average</span>`:""}
+            ${p.vsAccountAvg!=null?`<span>${p.vsAccountAvg}× the account average</span>`:""}
+            ${!p.permalink?`<span style="color:#e7a9a9">Post URL is not available in the uploaded dataset</span>`:""}
+          </div>
+        </div>`).join("")}
+    </div>` : "";
+  return `
+    <div class="intel-finding-card" data-finding-id="${esc(f.id)}">
+      <div class="intel-finding-head">
+        <span class="intel-finding-badge${f.risk?" risk":""}">${f.risk?"Watchout":"Finding"}</span>
+        <h3>${idx+1}. ${esc(f.headline)}</h3>
+      </div>
+      <p class="intel-finding-explanation">${esc(f.explanation)}</p>
+      ${metricsHtml?`<div class="intel-finding-metrics">${metricsHtml}</div>`:""}
+      ${evidenceHtml?`<div class="intel-finding-evidence-title">Evidence</div><ul class="intel-evidence-list">${evidenceHtml}</ul>`:""}
+      ${f.implication?`<p class="intel-finding-implication"><b>Why it matters:</b> ${esc(f.implication)}</p>`:""}
+      ${f.recommendation?`<p class="intel-finding-recommendation"><b>Recommendation:</b> ${esc(f.recommendation)}</p>`:""}
+      ${driverPostsHtml}
+    </div>`;
+}
+
+// "What is driving performance?" must SYNTHESIZE -- who/what drove the result, backed by
+// the strongest metric and its strategic implication -- never just re-list each finding's
+// own explanation sentence verbatim (that duplicates the Key Findings section word for
+// word). Built entirely from each finding's own structured fields (driverBrand/
+// driverPlatform/driverMediaType/driverDate, its top metric, its implication) rather than
+// any new text-analysis system, so this stays inside the deterministic-JS-only constraint.
+function execSynthesizeDriverPoint(f){
+  const scopeBits = [];
+  if(f.driverBrand) scopeBits.push(esc(f.driverBrand));
+  if(f.driverPlatform) scopeBits.push(platDisplay(f.driverPlatform));
+  if(f.driverMediaType) scopeBits.push(cap(f.driverMediaType));
+  if(f.driverDate) scopeBits.push(formatDatePretty(f.driverDate));
+  const who = scopeBits.length ? scopeBits.join(" · ") : "Account-wide";
+  const metric = (f.metrics||[])[0];
+  const metricPart = metric ? `${metric.label}: ${metric.value}` : null;
+  const impliesPart = f.implication ? f.implication.charAt(0).toLowerCase()+f.implication.slice(1) : null;
+  const bits = [who, metricPart, impliesPart].filter(Boolean);
+  return execCleanupText(bits.join(" — "));
+}
+function execSynthesizeDriverSection(findings){
+  const driverFindings = findings.filter(f=>f.driverPlatform || f.driverMediaType || f.driverBrand || f.driverDate);
+  if(!driverFindings.length) return [];
+  const sorted = [...driverFindings].sort((a,b)=>b.score-a.score);
+  return sorted.slice(0,5).map(execSynthesizeDriverPoint);
+}
+
 function renderIntelligenceReport(){
   const rawP = getActivePerformanceView();
   if(!rawP) return;
@@ -8052,127 +9222,59 @@ function renderIntelligenceReport(){
   const contentScope = STATE.intelContentScope || "all";
   const P = showScopeToggle ? contentScopeAgg(rawP, contentScope) : rawP;
   const declared = P.declared||{};
-  const multiBrand = P.profiles.length>1, multiPlatform = P.platforms.length>1;
-  const compareBy = multiBrand ? "brand" : (multiPlatform ? "platform" : null);
-  const slices = compareBy ? computeEntitySlices(P, compareBy) : null;
-  const iconFn = compareBy==="platform" ? (name)=>platformIconHTML(name)+" " : ()=>"";
-  const {sentences, highlights} = buildIntelligenceNarrative(P);
   const brandsLabel = (declared.brands&&declared.brands.length?declared.brands:P.profiles).join(", ");
+
+  const { findings } = computeExecutiveFindings(P);
+  const nonRiskFindings = findings.filter(f=>!f.risk);
+  const riskFindings = findings.filter(f=>f.risk);
+  const summaryPoints = findings.slice(0,5).map(f=>f.headline);
 
   let html = `
     <div class="intel-masthead">
-      <h1>Data Intelligence Report</h1>
+      <h1>Executive Intelligence</h1>
       <p>${esc(brandsLabel)} &middot; ${esc(P.platforms.join(", "))} &middot; ${P.date_from?`${formatDatePretty(P.date_from)} to ${formatDatePretty(P.date_to)}`:"full period"} &middot; Generated ${formatDatePretty(new Date().toISOString().slice(0,10))}</p>
     </div>
     ${showScopeToggle?contentScopeToggleHTML("intelContentScope"):""}
-    <div class="intel-highlights">
-      <h2>Key highlights</h2>
-      <ul>${highlights.map(h=>`<li>${h}</li>`).join("")}</ul>
-    </div>
-    <p class="intel-narrative">${sentences.join(" ")}</p>
   `;
 
-  html += `<div class="intel-section"><h2>Headline metrics</h2>`;
-  if(slices){
-    html += `<div class="intel-entity-block"><h3 class="intel-entity-title">Combined (all ${compareBy==="brand"?"brands":"platforms"})</h3>${intelMetricsGridHTML(P.totals)}</div>`;
-    slices.forEach(s=>{
-      html += `<div class="intel-entity-block"><h3 class="intel-entity-title" dir="auto">${iconFn(s.name)}${esc(s.name)}</h3>${intelMetricsGridHTML(s.agg.totals)}</div>`;
-    });
-  } else {
-    html += intelMetricsGridHTML(P.totals);
-  }
+  html += `<div class="intel-section intel-exec-summary"><h2>Executive summary</h2>`;
+  html += summaryPoints.length
+    ? `<ul>${summaryPoints.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>`
+    : `<p class="intel-empty-note">The data does not currently show a change or pattern large enough to report with confidence -- results this period are broadly steady versus what the evidence can support.</p>`;
   html += `</div>`;
 
-  if(multiBrand || multiPlatform){
-    html += `<div class="intel-section"><h2>Comparison</h2><div class="intel-chart-card"><canvas id="intelLeaderboardChart" height="90"></canvas></div></div>`;
-  }
-
-  html += `<div class="intel-section"><h2>Content strategy</h2>`;
-  if(slices){
-    slices.forEach(s=>{
-      html += `<div class="intel-entity-block"><h3 class="intel-entity-title" dir="auto">${iconFn(s.name)}${esc(s.name)}</h3>${intelBarlistHTML(Object.entries(s.agg.mediaType||{}).sort((a,b)=>b[1]-a[1]))}</div>`;
-    });
-  } else {
-    html += intelBarlistHTML(Object.entries(P.mediaType||{}).sort((a,b)=>b[1]-a[1]));
-  }
+  html += `<div class="intel-section"><h2>Key findings</h2>`;
+  html += nonRiskFindings.length
+    ? nonRiskFindings.map((f,i)=>execFindingCardHTML(f,i)).join("")
+    : `<p class="intel-empty-note">No finding currently clears the evidence bar for this scope and date range.</p>`;
   html += `</div>`;
 
-  html += `<div class="intel-section"><h2>Posting behavior</h2><div class="intel-chart-card"><canvas id="intelCadenceChart" height="90"></canvas></div>
-    ${slices?`<p style="font-size:11px;color:#9fb0d0;margin:8px 0 0">Posts per day of week, by ${compareBy}.</p>`:""}</div>`;
-
-  html += `<div class="intel-section"><h2>Post performance</h2>`;
-  if(slices){
-    slices.forEach(s=>{
-      html += `<h3 class="intel-entity-title" dir="auto" style="margin-bottom:10px">${iconFn(s.name)}${esc(s.name)}</h3>${intelTopPostsHTML(s.agg.topPosts, 3)}`;
-    });
-  } else {
-    html += intelTopPostsHTML(P.topPosts, 5);
+  const driverPoints = execSynthesizeDriverSection(findings);
+  if(driverPoints.length){
+    html += `<div class="intel-section"><h2>What is driving performance?</h2><ul class="intel-evidence-list intel-driver-summary">${driverPoints.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>`;
   }
+
+  const recs = findings.filter(f=>f.recommendation);
+  html += `<div class="intel-section"><h2>Recommendations</h2>`;
+  html += recs.length
+    ? recs.map(f=>`<div class="intel-recommendation-card"><b>${esc(f.headline)}:</b> ${esc(f.recommendation)}</div>`).join("")
+    : `<p class="intel-empty-note">No recommendation currently meets the evidence bar -- none of the detected patterns were strong enough to support a specific action.</p>`;
+  html += `</div>`;
+
+  html += `<div class="intel-section"><h2>Watchouts / risks</h2>`;
+  const riskCards = riskFindings.map((f,i)=>execFindingCardHTML(f,i));
+  const warningCards = (P.warnings||[]).map(w=>`<div class="intel-watchout-card">${esc(String(w))}</div>`);
+  const allWatchouts = riskCards.concat(warningCards);
+  html += allWatchouts.length ? allWatchouts.join("") : `<p class="intel-empty-note">No risks or data-quality issues detected for this scope and date range.</p>`;
   html += `</div>`;
 
   const footnotes = [];
   footnotes.push(`Based on ${fmt(P.rows)} posts. ${P.reachCovered}/${P.rows} carried a reach figure and ${P.impressionsCovered}/${P.rows} carried an impressions figure.`);
-  (P.warnings||[]).forEach(w=>footnotes.push(String(w).replace(/\s*—\s*/g, ", ")));
+  footnotes.push(`Every finding above is calculated directly from this export's own figures and calculations already used elsewhere on the dashboard -- none are inferred beyond what the data supports.`);
   html += `<div class="intel-footnote">${footnotes.map(f=>`<div>${esc(f)}</div>`).join("")}</div>`;
 
   $("intelligenceBody").innerHTML = html;
   if(showScopeToggle) bindContentScopeToggles($("intelligenceBody"), renderIntelligenceReport);
-
-  if(multiBrand || multiPlatform){
-    const dimension = multiBrand ? "brand" : "platform";
-    const rows = dimension==="brand" ? P.byProfile : P.byPlatform;
-    const labelKey = dimension==="brand" ? "profile" : "platform";
-    const kind = dimension==="platform" ? "platform" : "brand";
-    const sorted = [...rows].sort((a,b)=>b.engagement-a.engagement);
-    const rawColorMap = entityColorMap(sorted.map(r=>r[labelKey]), kind);
-    const colorMap = dedupeChartColors(sorted.map(r=>r[labelKey]), rawColorMap);
-    destroyChart("intelLeaderboard");
-    charts.intelLeaderboard = new Chart($("intelLeaderboardChart").getContext("2d"), {
-      type:"bar",
-      data:{ labels: sorted.map(r=>r[labelKey]), datasets:[
-        {label:"Posts", data:sorted.map(r=>r.posts), backgroundColor:sorted.map(r=>colorMap[r[labelKey]]+"66"), yAxisID:"y"},
-        {label:engagementMetricLabel(), data:sorted.map(r=>r.engagement), backgroundColor:sorted.map(r=>colorMap[r[labelKey]]), yAxisID:"y1"}
-      ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{position:"bottom", labels:{color:"#b8c4dc", boxWidth:10, font:{size:11}}}},
-        scales:{
-          x:{ticks:{color:"#b8c4dc"}, grid:{color:"rgba(255,255,255,.08)"}},
-          y:{position:"left", beginAtZero:true, ticks:{color:"#b8c4dc"}, grid:{color:"rgba(255,255,255,.08)"}},
-          y1:{position:"right", beginAtZero:true, ticks:{color:"#b8c4dc"}, grid:{drawOnChartArea:false}}
-        } },
-      plugins:[barValueLabelsPluginLight]
-    });
-  }
-
-  const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-  destroyChart("intelCadence");
-  if(slices){
-    const rawColorMap = entityColorMap(slices.map(s=>s.name), compareBy);
-    const colorMap = dedupeChartColors(slices.map(s=>s.name), rawColorMap);
-    charts.intelCadence = new Chart($("intelCadenceChart").getContext("2d"), {
-      type:"bar",
-      data:{ labels: DOW, datasets: slices.map(s=>({ label:s.name, data:DOW.map(d=>s.agg.cadence[d]||0), backgroundColor:colorMap[s.name] })) },
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{position:"bottom", labels:{color:"#b8c4dc", boxWidth:10,font:{size:11}}}},
-        scales:{ y:{beginAtZero:true, ticks:{color:"#b8c4dc"}, grid:{color:"rgba(255,255,255,.08)"}}, x:{ticks:{color:"#b8c4dc"}, grid:{color:"rgba(255,255,255,.08)"}} } },
-      plugins:[barValueLabelsPluginLight]
-    });
-  } else {
-    charts.intelCadence = new Chart($("intelCadenceChart").getContext("2d"), {
-      type:"bar",
-      data:{ labels: DOW, datasets:[
-        {label:"Posts", data: DOW.map(d=>P.cadence[d]||0), backgroundColor: CHART_PALETTE[4], yAxisID:"y"},
-        {label:engagementMetricLabel(), data: DOW.map(d=>(P.cadenceInteractions&&P.cadenceInteractions[d])||0), backgroundColor:"#3b82f6", yAxisID:"y1"}
-      ]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{position:"bottom", labels:{color:"#b8c4dc", boxWidth:10,font:{size:11}}}},
-        scales:{
-          y:{position:"left", beginAtZero:true, ticks:{color:"#b8c4dc"}, grid:{color:"rgba(255,255,255,.08)"}},
-          y1:{position:"right", beginAtZero:true, ticks:{color:"#b8c4dc"}, grid:{drawOnChartArea:false}}
-        } },
-      plugins:[barValueLabelsPluginLight]
-    });
-  }
 }
 
 function openIntelligencePanel(){
@@ -8333,14 +9435,98 @@ function benchmarkAggFor(brand){
 // only ever returns "single" (one platform) or "brand-platforms" (several platforms, same
 // company) -- both are the "sum within one brand's own accounts" case that's always safe,
 // never the cross-company sum the "never sum followers" rule actually guards against.
+// Round 115: the ERF% denominator ("Profile Followers") must sum EVERY profile x platform
+// combination present in P's own already-filtered row set, regardless of report type --
+// 1 brand x 1 platform has exactly one combo (so this is just that combo's own value); 1
+// brand x many platforms sums that brand's own platforms; many brands x 1 platform sums
+// those brands' followers on that one platform; many brands x many platforms sums every
+// selected brand's every selected platform. Narrowing the GLOBAL brand/platform filter
+// further (down to a single brand and/or platform) shrinks P.rowsData -- and therefore
+// this sum -- automatically, with no separate "revert to single X" branch needed: fewer
+// combos are simply present to add up. This intentionally supersedes the old per-mode
+// switch (which only ever handled the single-brand scopes and silently returned 0 for any
+// multi-brand scope) with one formula that's correct in all four cases.
 function benchmarkFollowersTotal(brand, P){
-  const widgets = computeFollowersWidgets(P.rowsData||[]);
-  const w = widgets && widgets[0];
-  if(!w) return 0;
-  if(w.mode==="single") return w.value||0;
-  if(w.mode==="brand-platforms") return w.total||0;
-  return 0;
+  const combos = Object.values((P&&P.followersByProfilePlatform)||{});
+  return combos.reduce((a,c)=>a+(c.value||0),0);
 }
+// Round 110: "Followers Number" per the explicit spec -- a semantic alias for
+// benchmarkFollowersTotal() (the brand param is unused there; kept only for that
+// function's own call sites) named after the spec's own term, so every consumer that
+// needs this figure (the ERF% KPI, both live and in Benchmarking)
+// reads as calling out exactly the defined concept: "the Profile followers value from the
+// row with the LATEST DATE within whichever range P.rowsData is already scoped to -- never
+// the maximum numerical value, and never a value from outside that range even if a wider
+// Main Date Range exists." That scoping itself is NOT decided here -- it comes for free
+// from whatever rows the caller's P was built from (getActivePerformanceView() for the live
+// dashboard, already filtered by the Dashboard Date Range; benchmarkAggFor()/
+// timeBenchAggFor() for Benchmarking, already filtered by benchmarkEffectiveRange()/the
+// selected comparison range) -- and aggregatePerformanceRows() itself already resolves
+// followersByProfilePlatform by comparing DATES, never by comparing VALUES, so "latest
+// date wins" was already correct everywhere upstream of this alias.
+function followersNumberFor(P){ return benchmarkFollowersTotal(null, P); }
+// Round 110: the three new engagement-rate KPI formulas, exactly as specified --
+// implemented once here so the live dashboard's KPI grid and both Benchmarking branches
+// (benchmarkMetricValue/timeBenchMetricValue) all compute identically from the same code,
+// never duplicating the arithmetic. All three read 0 (never NaN/Infinity) when their
+// denominator is unavailable, which is what makes them eligible for the existing
+// zero-value "x to remove" convention everywhere they're used.
+function erfPctValue(engagement, followersNumber){
+  return followersNumber>0 ? (engagement/followersNumber)*100 : 0;
+}
+function erByReachPctValue(engagement, reach){
+  return reach>0 ? (engagement/reach)*100 : 0;
+}
+function eriByImpressionsPctValue(engagement, impressions){
+  return impressions>0 ? (engagement/impressions)*100 : 0;
+}
+// Round 115: the 3 separate Round 110 KPI cards (ERF%/ER%/ERi%) are unified into one card
+// with a pill toggle beside its title -- default ERF per explicit request. kpiTileFn is
+// the render-scoped kpiTile() closure from renderPerfOverview() (needed for the shared
+// removed-KPI-state/zero-value-remove-button logic every other Overview card already goes
+// through), passed in rather than duplicated here. The engagement numerator for all 3
+// metrics already respects the global Engagement Metric selection because t.engagement
+// (the caller's own totals) is itself computed from engagementValueOf(), which switches on
+// STATE.perfEngagementMetric -- nothing here needs to re-check that selection directly.
+// Round 115 hotfix: the unified Overview ER card's Compare (B/P) buttons pass through
+// metricKey="engagement_rate" to the shared mini-KPI-tile/export machinery below --
+// unlike every other KPI, this one has no single summable field on a totals object (there
+// is no t.engagement_rate), so both call sites need to compute whichever of ERF%/ER%/ERi%
+// STATE.overviewErMetric currently has selected (the same live toggle state the Overview
+// card itself reads) rather than silently reading undefined and always showing 0.
+function erMetricCurrentValue(engagement, reach, impressions, followersNumber){
+  const erMetric = STATE.overviewErMetric || "erf";
+  if(erMetric==="er") return erByReachPctValue(engagement, reach);
+  if(erMetric==="eri") return eriByImpressionsPctValue(engagement, impressions);
+  return erfPctValue(engagement, followersNumber);
+}
+function erKpiTileHTML(P, t, kpiTileFn){
+  const erMetric = STATE.overviewErMetric || "erf";
+  const labels = { erf:"ERF%", er:"ER%", eri:"ERi%" };
+  const rawValues = {
+    erf: erfPctValue(t.engagement, followersNumberFor(P)),
+    er: erByReachPctValue(t.engagement, t.reach),
+    eri: eriByImpressionsPctValue(t.engagement, t.impressions)
+  };
+  const subtitles = {
+    erf: `${esc(engagementMetricLabel())} as a % of total followers`,
+    er: `${esc(engagementMetricLabel())} as a % of reach`,
+    eri: `${esc(engagementMetricLabel())} as a % of impressions`
+  };
+  const toggleHtml = `<div class="pill-toggle kpi-er-toggle" id="overviewErMetricToggle">
+    <button type="button" data-er-metric="erf" class="${erMetric==="erf"?"active":""}">ERF</button>
+    <button type="button" data-er-metric="er" class="${erMetric==="er"?"active":""}">ER%</button>
+    <button type="button" data-er-metric="eri" class="${erMetric==="eri"?"active":""}">ERi</button>
+  </div>`;
+  return kpiTileFn("engagement_rate", "engagement", labels[erMetric], labels[erMetric],
+    rawValues[erMetric], "sparkEngagementRate", subtitles[erMetric], null, "pct", toggleHtml);
+}
+// Round 110: shared key list for the 3 new percentage-based KPI cards -- used to (a) pick
+// the percentage-aware value formatter (fmtSpanPct) instead of the plain count-up
+// abbreviation in both Benchmarking branches' mini KPI cards, and (b) extend
+// BIGD_ZERO_REMOVABLE_KPI_KEYS below with the same "x" removal eligibility as Reach/
+// Impressions/Video views.
+const BIGD_PCT_KPI_KEYS = ["erf_1k_followers", "er_by_reach", "eri_by_impressions"];
 // Round 66: transient render-time lookup for the Top/Lowest 10 posts rank-click -> post
 // details sidebar (see bigdBenchmarkPostRowHTML()/bigdOpenBenchmarkPostFromRank()). Rebuilt
 // fresh on every render that touches these lists, so it only ever needs to survive from
@@ -8530,6 +9716,9 @@ function benchmarkRemovedKpisFor(brand){
 function benchmarkMetricValue(key, brand, t, P){
   if(key==="avgPerPost") return t.posts ? t.engagement/t.posts : 0;
   if(key==="followers") return benchmarkFollowersTotal(brand, P);
+  if(key==="erf_1k_followers") return erfPctValue(t.engagement, benchmarkFollowersTotal(brand, P));
+  if(key==="er_by_reach") return erByReachPctValue(t.engagement, t.reach);
+  if(key==="eri_by_impressions") return eriByImpressionsPctValue(t.engagement, t.impressions);
   return t[key]||0;
 }
 // Round 62: "Show % of change" (see renderBenchmarkChangeCompareRow()) -- returns the chosen
@@ -8555,7 +9744,11 @@ function benchmarkChangeCompareBaselineFor(brand){
 // letting the user remove the card is the useful action there. Shared by BOTH Benchmarking
 // View branches (Brand & Platform Comparison's benchmarkKpiCardsHTML() and Performance Over
 // Time's timeBenchKpiCardsHTML()), so both stay in sync from one source of truth.
-const BIGD_ZERO_REMOVABLE_KPI_KEYS = ["reach", "impressions", "video_views"];
+// Round 116: per explicit request, ERF% loses its zero-value "x" in the Benchmarking
+// views specifically (ER%/ERi% keep theirs) -- BIGD_PCT_KPI_KEYS itself is left untouched
+// since it still drives percentage-aware VALUE formatting for all 3 metrics; only this
+// removability list excludes erf_1k_followers.
+const BIGD_ZERO_REMOVABLE_KPI_KEYS = ["reach", "impressions", "video_views"].concat(BIGD_PCT_KPI_KEYS.filter(k=>k!=="erf_1k_followers"));
 function benchmarkKpiCardsHTML(brand, t, P){
   const removed = benchmarkRemovedKpisFor(brand);
   // Round 62: when this brand is a chosen competitor, every card below also gets a
@@ -8575,7 +9768,12 @@ function benchmarkKpiCardsHTML(brand, t, P){
     {key:"comments", label:"Comments"},
     {key:"shares", label:"Shares"},
     {key:"followers", label:"Followers"},
-    {key:"video_views", label:"Video views"}
+    {key:"video_views", label:"Video views"},
+    // Round 110: the 3 new engagement-rate KPI cards, added to this Brand & Platform
+    // Comparison branch alongside its Performance Over Time twin (timeBenchKpiCardsHTML).
+    {key:"erf_1k_followers", label:"ERF%"},
+    {key:"er_by_reach", label:"ER%"},
+    {key:"eri_by_impressions", label:"ERi%"}
   ];
   return metrics.filter(m=>!removed.includes(m.key)).map(m=>{
     const value = benchmarkMetricValue(m.key, brand, t, P);
@@ -8587,7 +9785,10 @@ function benchmarkKpiCardsHTML(brand, t, P){
     // this "x" now removes the metric from EVERY compared entity in one action (see
     // commitPendingWidgetRemoval()'s "benchmarkKpi" branch), not just this one card, so a
     // single-brand-prefixed label would misrepresent what's actually happening.
-    return `<div class="bmini-card${isZero?" bmini-removable":""}"><div class="l">${esc(m.label)}</div><div class="bmini-v-row"><div class="v">${fmtSpan(value)}</div>${deltaHtml}</div>${isZero?widgetRemoveBtnHTML("benchmarkKpi", brand+"::"+m.key, "Remove this KPI", m.label):""}</div>`;
+    // Round 110: the 3 new percentage-based metrics render through fmtSpanPct (decimal-
+    // precision "%", no K/M abbreviation) instead of the plain count-up fmtSpan.
+    const valueHtml = BIGD_PCT_KPI_KEYS.includes(m.key) ? fmtSpanPct(value) : fmtSpan(value);
+    return `<div class="bmini-card${isZero?" bmini-removable":""}"><div class="l">${esc(m.label)}</div><div class="bmini-v-row"><div class="v">${valueHtml}</div>${deltaHtml}</div>${isZero?widgetRemoveBtnHTML("benchmarkKpi", brand+"::"+m.key, "Remove this KPI", m.label):""}</div>`;
   }).join("");
 }
 function benchmarkTimelineBoxHTML(brand){
@@ -9209,7 +10410,20 @@ function renderBenchmarkChangeCompareRow(){
   if(mainSelect) mainSelect.addEventListener("change", ()=>{
     // Only the pending draft changes here -- nothing is Applied/Active yet, so a plain
     // re-render of just this row (not the whole benchmark body) is enough, and cheaper.
+    const previousMain = STATE.benchmarkChangeComparePendingMain;
     STATE.benchmarkChangeComparePendingMain = mainSelect.value;
+    // Round 123: the brand that WAS main moves down into the Competitors list the moment
+    // Main Brand changes (ensureBenchmarkChangeComparePending(), called on the very next
+    // render, always prunes the NEW main out of the pending competitor list) -- but nothing
+    // ever added the OLD main back INTO that list, so it landed there unselected, forcing the
+    // user to click it again to re-include it in the comparison. It should already be
+    // selected/enabled as soon as it moves into Competitors, with no extra click needed.
+    // Guarded to a real, different, previously-valid brand so this never fires on the row's
+    // very first render (previousMain undefined) or a no-op re-selection of the same brand.
+    if(previousMain && previousMain!==STATE.benchmarkChangeComparePendingMain){
+      const list = STATE.benchmarkChangeComparePendingCompetitors || (STATE.benchmarkChangeComparePendingCompetitors = []);
+      if(!list.includes(previousMain)) list.push(previousMain);
+    }
     renderBenchmarkChangeCompareRow();
   });
   qsa("[data-bcc-competitor]", el).forEach(pill=> pill.addEventListener("click", ()=>{
@@ -9247,9 +10461,17 @@ function renderBenchmarkChangeCompareRow(){
 // (same convention every other *HTML() function in this file already follows) -- this function
 // does not re-escape its inputs, so it never double-encodes an already-escaped substring
 // (e.g. a brand name embedded inside the subtitle).
-function benchmarkModalHeaderHTML(title, subtitle){
-  return `<h2 class="benchmark-header-title">${title}</h2>
-    <p class="benchmark-header-subtitle">${subtitle}</p>`;
+function benchmarkModalHeaderHTML(title, subtitle, exportSectionKey){
+  // Round 116: optional export button, shared by both Benchmarking branches through this
+  // one function (see its own header comment) -- Brand & Platform Comparison passes
+  // "benchmark", Performance Over Time passes "timebench"; each routes through the exact
+  // same Export options popup (openExportPopup -> runResolvedExport) every other export
+  // button in the file already uses, not a separate one-off mechanism.
+  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+    <div style="min-width:0"><h2 class="benchmark-header-title">${title}</h2>
+      <p class="benchmark-header-subtitle">${subtitle}</p></div>
+    ${exportSectionKey?exportBtnHTML(exportSectionKey):""}
+  </div>`;
 }
 // Round 75, item 2: the ONE shared collapse/expand toolbar both branches render at the top of
 // their own .benchmark-filter-bar -- a single whole-panel STATE flag
@@ -9312,7 +10534,8 @@ function renderBenchmarkView(){
     "Brand & Platform Comparison",
     mode==="platform"
       ? "Side-by-side snapshot of this brand's platforms. Tap a platform below to show or hide its column."
-      : "Side-by-side snapshot of your brands. Tap a brand below to show or hide its column."
+      : "Side-by-side snapshot of your brands. Tap a brand below to show or hide its column.",
+    "benchmark"
   );
   // Round 75, item 2: same reasoning as the header block just above -- the toolbar's own
   // markup comes from the shared benchmarkFilterToolbarHTML(), and only the body WRAPPER's
@@ -9823,7 +11046,7 @@ function renderTimeBenchSetup(){
   const ranges = STATE.timeBenchRanges || [];
   const fullRange = timeBenchFullDateRange();
   el.innerHTML = `
-    ${benchmarkModalHeaderHTML("Performance Over Time", `Comparing ${esc(STATE.timeBenchBrand||"—")}'s performance across different date ranges. Selected platforms are combined into one total, and stay the same for every range below.`)}
+    ${benchmarkModalHeaderHTML("Performance Over Time", `Comparing ${esc(STATE.timeBenchBrand||"—")}'s performance across different date ranges. Selected platforms are combined into one total, and stay the same for every range below.`, "timebench")}
     <!-- Round 72 introduced the shared neutral filter-panel card here, matching Brand &
          Platform Comparison's own. Round 73: same de-gridding as that branch -- one
          full-width row per group, title then that group's control on the same row -- plus
@@ -9890,6 +11113,9 @@ function renderTimeBenchSetup(){
 function timeBenchMetricValue(key, t, P){
   if(key==="avgPerPost") return t.posts ? t.engagement/t.posts : 0;
   if(key==="followers") return benchmarkFollowersTotal(null, P);
+  if(key==="erf_1k_followers") return erfPctValue(t.engagement, benchmarkFollowersTotal(null, P));
+  if(key==="er_by_reach") return erByReachPctValue(t.engagement, t.reach);
+  if(key==="eri_by_impressions") return eriByImpressionsPctValue(t.engagement, t.impressions);
   return t[key]||0;
 }
 // Round 51: inclusive day count for the "(N days)" display next to each range's dates --
@@ -9995,7 +11221,12 @@ function timeBenchKpiCardsHTML(rangeIdx){
     {key:"comments", label:"Comments"},
     {key:"shares", label:"Shares"},
     {key:"followers", label:"Followers"},
-    {key:"video_views", label:"Video views"}
+    {key:"video_views", label:"Video views"},
+    // Round 110: the 3 new engagement-rate KPI cards, added here alongside its Brand &
+    // Platform Comparison twin (benchmarkKpiCardsHTML).
+    {key:"erf_1k_followers", label:"ERF%"},
+    {key:"er_by_reach", label:"ER%"},
+    {key:"eri_by_impressions", label:"ERi%"}
   ];
   return metrics.filter(m=>!removed.includes(m.key)).map(m=>{
     const value = timeBenchMetricValue(m.key, t, P);
@@ -10007,15 +11238,16 @@ function timeBenchKpiCardsHTML(rangeIdx){
     // "timeBenchKpi" branch), not just this one range's card, so a single-range-prefixed
     // label would misrepresent what's actually happening.
     // Round 82 (supersedes round 60's "zero-value-only" rule): scoped to the same
-    // BIGD_ZERO_REMOVABLE_KPI_KEYS (Reach/Impressions/Video views) as the Brand/Platform
-    // branch -- see that constant's own comment.
+    // BIGD_ZERO_REMOVABLE_KPI_KEYS (Reach/Impressions/Video views, now also the 3 Round 110
+    // percentage metrics) as the Brand/Platform branch -- see that constant's own comment.
     // Round 99: same single-owned-brand guard as everywhere else this "x" appears.
     const isZero = !value && BIGD_ZERO_REMOVABLE_KPI_KEYS.includes(m.key) && !isSingleOwnedBrandScope();
     // Round 62: Followers renders as a full, non-abbreviated whole number ("12,450", never
     // "12.5K") per explicit request -- every other metric keeps the normal K/M-abbreviated
     // count-up. Scoped to Performance Over Time only; Brand & Platform Comparison's own
-    // Followers card is untouched.
-    const valueHtml = m.key==="followers" ? fmtSpanFull(value) : fmtSpan(value);
+    // Followers card is untouched. Round 110: the 3 new percentage metrics render through
+    // fmtSpanPct instead (decimal-precision "%", never K/M-abbreviated or whole-rounded).
+    const valueHtml = m.key==="followers" ? fmtSpanFull(value) : (BIGD_PCT_KPI_KEYS.includes(m.key) ? fmtSpanPct(value) : fmtSpan(value));
     return `<div class="bmini-card${isZero?" bmini-removable":""}"><div class="l">${esc(m.label)}</div><div class="bmini-v-row"><div class="v">${valueHtml}</div>${deltaHtml}</div>${isZero?widgetRemoveBtnHTML("timeBenchKpi", rangeIdx+"::"+m.key, "Remove this KPI", m.label):""}</div>`;
   }).join("");
 }
@@ -12261,6 +13493,27 @@ function perfBrandBestPostMetric(defs){
 // bundle for many-brands x many-platforms.
 function perfBestPostPerBrandSectionHTML(P, defs){
   const options = defs.filter(d=>d.key!=="posts");
+  // Round 122: when the active filter narrows to content with no reported engagement/reach/
+  // impressions/video data at all (e.g. Twitter "shared"/retweet rows, which Emplifi exports
+  // with every metric column blank), perfBrandMetricDefs() correctly drops every metric def
+  // except "posts" itself (see its own `available` checks) -- leaving `options` (defs minus
+  // "posts") EMPTY. `options.find(...) || options[0]` then evaluated to undefined, and the very
+  // next line's `d.key===selDef.key` crashed with "Cannot read properties of undefined" --
+  // an uncaught exception that silently aborted the rest of renderPerformanceDashboard()'s
+  // synchronous render chain, so every section after this one (Post Performance, Data Quality)
+  // was left as an empty <section> with nothing in it. Reproduced with 2 real brands' actual
+  // Emplifi exports: Global Filter Brand=All + Content type=shared crashed here (only "posts"
+  // survives as an available metric across both brands combined); Brand=one-brand-only never
+  // even reached this function (multiBrand becomes false, see call site's own guard) -- exactly
+  // matching the reported "works for 1 brand, breaks for all/both" pattern. A "best post by X"
+  // comparison is meaningless with no X to compare, so this now reads as an explicit empty
+  // state instead of a crash.
+  if(!options.length){
+    return `<div class="card" style="margin-bottom:16px">
+    <h3 style="margin:0 0 8px">Top Engaged Posts</h3>
+    <div class="foot">No engagement, reach, or impressions data reported for the current filter -- only post counts are available, so there's no metric left to rank "best post" by.</div>
+  </div>`;
+  }
   const selected = perfBrandBestPostMetric(defs);
   const selDef = options.find(d=>d.key===selected) || options[0];
   const opts = options.map(d=>`<option value="${esc(d.key)}"${d.key===selDef.key?" selected":""}>${esc(d.label)}</option>`).join("");
@@ -12665,10 +13918,22 @@ function renderPerfPosts(){
   const P = getActivePerformanceView();
   const showScopeToggle = hasStoriesIn(P.rowsData||[]);
   const contentScope = STATE.perfPostsContentScope || "all";
-  const allBrands = (STATE.performance && STATE.performance.profiles) || [];
-  const allPlatforms = (STATE.performance && STATE.performance.platforms) || [];
-  const allMediaTypes = STATE.performance ? Array.from(new Set((STATE.performance.rowsData||[]).map(r=>r.media_type).filter(Boolean))) : [];
-  const allContentTypes = STATE.performance ? Array.from(new Set((STATE.performance.rowsData||[]).map(r=>r.content_type).filter(Boolean))) : [];
+  // Round 121: these 4 pill-option lists must come from P (the already GLOBALLY-filtered
+  // view this function already uses for everything else below) rather than the raw,
+  // global-filter-unaware STATE.performance -- using the raw dataset let a brand/platform/
+  // media/content-type pill render and stay clickable even when the active Global Filter
+  // (sidebar brand/platform selection) had already excluded every row that value could
+  // ever match, silently producing "No posts in this export" with no visible reason why.
+  // Reported case: a Twitter-only "shared" (retweet) content type existing for exactly one
+  // brand in the raw export -- picking "shared" while the Global Filter excluded that one
+  // brand looked broken, even though every OTHER content type kept working normally (they
+  // all had rows from brands still in scope). This is purely which list feeds the pills;
+  // this page's own local filters (perfPostsBrandFilter etc.) are unrelated STATE keys and
+  // still narrow further within P exactly as before -- unaffected by this fix.
+  const allBrands = P.profiles || [];
+  const allPlatforms = P.platforms || [];
+  const allMediaTypes = Array.from(new Set((P.rowsData||[]).map(r=>r.media_type).filter(Boolean)));
+  const allContentTypes = Array.from(new Set((P.rowsData||[]).map(r=>r.content_type).filter(Boolean)));
   const localBrand = STATE.perfPostsBrandFilter || "all";
   const localPlatform = STATE.perfPostsPlatformFilter || "all";
   const localMediaType = STATE.perfPostsMediaTypeFilter || "all";
@@ -13525,17 +14790,40 @@ function bindOverviewSparklines(P){
     const posts = seriesFor(P.dailyPostsTotal), eng = seriesFor(P.dailyInteractionsTotal);
     return posts.map((p,i)=> p ? eng[i]/p : 0);
   })();
+  // Round 110: per-day series for the 3 new engagement-rate KPI cards, same "derive a daily
+  // ratio from two existing daily series" approach avgSeries above already uses. Followers
+  // Number is one fixed value across the whole range (followersNumberFor(P) -- the latest-
+  // date-within-range snapshot, not a per-day figure), so ERF's series divides each day's
+  // interactions by that same constant denominator throughout.
+  const dailyEngagementSeries = seriesFor(P.dailyInteractionsTotal);
+  const dailyReachSeries = seriesFor(bigdTotalDailyReach(P));
+  const dailyImpressionsSeries = seriesFor(bigdDailySum(rows,"impressions"));
+  // Round 115: the stale "*1000" here was a Round-110-era leftover from before Round 112
+  // redefined ERF% to engagement/total followers (no per-1000 multiplier) -- erfPctValue()
+  // itself was corrected then, but this separate sparkline formula never was, so the mini
+  // chart was silently plotting a scale 1000x the card's own value. Fixed to match
+  // erfPctValue() exactly. The 3 Round 110 cards are now ONE unified card (see
+  // erKpiTileHTML()), so only whichever metric STATE.overviewErMetric currently selects
+  // gets its sparkline painted, onto the single shared "sparkEngagementRate" canvas.
+  const followersNumForSpark = followersNumberFor(P);
+  const erfSeries = dailyEngagementSeries.map(v => followersNumForSpark>0 ? (v/followersNumForSpark)*100 : 0);
+  const erByReachSeries = dailyEngagementSeries.map((v,i)=> dailyReachSeries[i] ? (v/dailyReachSeries[i])*100 : 0);
+  const eriByImpressionsSeries = dailyEngagementSeries.map((v,i)=> dailyImpressionsSeries[i] ? (v/dailyImpressionsSeries[i])*100 : 0);
+  const erMetricForSpark = STATE.overviewErMetric || "erf";
+  const erActiveSeries = erMetricForSpark==="er" ? erByReachSeries : (erMetricForSpark==="eri" ? eriByImpressionsSeries : erfSeries);
+  const erActiveColor = erMetricForSpark==="er" ? "#22c55e" : (erMetricForSpark==="eri" ? "#eab308" : "#0ea5e9");
   const specs = [
     ["sparkPosts", seriesFor(P.dailyPostsTotal), "#8b5cf6"],
-    ["sparkEngagement", seriesFor(P.dailyInteractionsTotal), "#3b82f6"],
+    ["sparkEngagement", dailyEngagementSeries, "#3b82f6"],
     ["sparkAvgEngagement", avgSeries, "#ec4899"],
-    ["sparkReach", seriesFor(bigdTotalDailyReach(P)), "#10b981"],
-    ["sparkImpressions", seriesFor(bigdDailySum(rows,"impressions")), "#f59e0b"],
+    ["sparkReach", dailyReachSeries, "#10b981"],
+    ["sparkImpressions", dailyImpressionsSeries, "#f59e0b"],
     ["sparkLikes", seriesFor(bigdDailySum(rows,"likes")), "#ef4444"],
     ["sparkComments", seriesFor(bigdDailySum(rows,"comments")), "#06b6d4"],
     ["sparkShares", seriesFor(bigdDailySum(rows,"shares")), "#a855f7"],
     ["sparkVideoViews", seriesFor(bigdDailySum(rows,"video_views")), "#14b8a6"],
-    ["sparkStories", seriesFor(bigdDailyStoryCount(rows)), "#f472b6"]
+    ["sparkStories", seriesFor(bigdDailyStoryCount(rows)), "#f472b6"],
+    ["sparkEngagementRate", erActiveSeries, erActiveColor]
   ];
   specs.forEach(([id, series, color])=>{
     if($(id)) bigdMakeSparkline(id, days, series, color);
@@ -16144,7 +17432,7 @@ function bootstrap(){
     const declared = (P && P.declared) || {};
     const brandsLabel = (declared.brands && declared.brands.length ? declared.brands : (P?P.profiles:[])).join("-") || "Report";
     const dateStamp = (P && P.date_to ? P.date_to : new Date().toISOString().slice(0,10));
-    const title = `Data Intelligence - ${brandsLabel} - ${dateStamp}`.replace(/[\\/:*?"<>|]/g, "-");
+    const title = `Executive Intelligence - ${brandsLabel} - ${dateStamp}`.replace(/[\\/:*?"<>|]/g, "-");
 
     INTEL_CHART_KEYS.forEach(k=> setIntelChartTheme(charts[k], false));
     const temp = document.createElement("div");
@@ -16189,6 +17477,28 @@ function bootstrap(){
       .intel-post-text{font-size:13px;line-height:1.5;color:#161a20;}
       .intel-post-stats{display:flex;gap:14px;font-size:11px;color:#555;margin-top:8px;flex-wrap:wrap;}
       .intel-footnote{font-size:11px;color:#555;border-top:1px solid #e3e6ea;padding-top:16px;margin-top:6px;line-height:1.6;}
+      .intel-empty-note{font-size:12.5px;color:#555;}
+      .intel-exec-summary ul{margin:0;padding-left:20px;}
+      .intel-exec-summary li{margin-bottom:8px;font-size:13.5px;line-height:1.5;color:#161a20;}
+      .intel-finding-card{background:#f4f6f9;border:1px solid #dde1e7;border-radius:14px;padding:18px 20px;margin-bottom:16px;break-inside:avoid;}
+      .intel-finding-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+      .intel-finding-head h3{margin:0;font-size:14px;font-weight:800;color:#111;line-height:1.4;}
+      .intel-finding-badge{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;}
+      .intel-finding-badge.risk{background:#fee2e2;color:#b91c1c;}
+      .intel-finding-explanation{font-size:13px;line-height:1.6;color:#2b2f36;margin:0 0 12px;}
+      .intel-finding-metrics{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+      .intel-finding-metric{background:#fff;border:1px solid #dde1e7;border-radius:10px;padding:8px 12px;min-width:100px;}
+      .intel-finding-metric .v{font-size:16px;font-weight:800;color:#111;}
+      .intel-finding-metric .l{font-size:9.5px;color:#555;text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+      .intel-finding-evidence-title{font-size:10.5px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px;}
+      .intel-evidence-list{margin:0 0 12px;padding-left:18px;}
+      .intel-evidence-list li{font-size:12px;line-height:1.6;color:#333;margin-bottom:4px;}
+      .intel-finding-implication{font-size:12.5px;line-height:1.6;color:#2b2f36;margin:0 0 8px;}
+      .intel-finding-recommendation{font-size:12.5px;line-height:1.6;color:#166534;margin:0 0 4px;}
+      .intel-recommendation-card{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 16px;margin-bottom:10px;font-size:12.5px;line-height:1.6;color:#161a20;break-inside:avoid;}
+      .intel-watchout-card{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:10px;font-size:12.5px;line-height:1.6;color:#161a20;break-inside:avoid;}
+      .intel-driver-posts{margin-top:10px;padding-top:10px;border-top:1px dashed #dde1e7;}
+      .intel-driver-posts-title{font-size:10.5px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
       .barlist .row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12.5px;}
       .barlist .row .lbl{width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333 !important;}
       .barlist .row .track{flex:1;background:#e9ebee !important;border-radius:6px;height:10px;overflow:hidden;}
