@@ -1809,15 +1809,37 @@ body.mode-performance #performanceRoot .grid-kpi .card.kpi .widget-head-row .lab
   background:var(--accent);color:#fff;
 }
 .wizard-nav-confirm-newtab:hover{background:var(--accent-dark);}
+/* Round 130: "Save current view" (safe, non-destructive -- styled like the existing accent
+   "Open in New Tab" button) and "Go to saved views" (a neutral secondary action, like
+   Cancel) on the same confirm dialog. Both default to display:none in the static markup
+   and are only revealed by openWizardNavConfirm() once SAVED_VIEWS_AVAILABLE (and, for
+   "Go to saved views", a non-empty SAVED_VIEWS_CACHE) confirm there's a backend/saved view
+   to act on. */
+.wizard-nav-confirm-save{
+  border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;
+  background:var(--accent);color:#fff;
+}
+.wizard-nav-confirm-save:hover{background:var(--accent-dark);}
+.wizard-nav-confirm-goto-saved{
+  border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;
+  background:var(--neutral-soft);color:var(--text);
+}
+.wizard-nav-confirm-goto-saved:hover{background:var(--card-border);}
 /* Round 88: at the shared .widget-remove-confirm-panel's own 340px width, "Open in New Tab"
    (the longest of the 3 button labels here, unlike the 2-button KPI-remove modal's short
    Cancel/Remove) wrapped onto two lines. Widened just THIS panel via its id (id beats the
    shared class's own width:340px, no need to touch that class or the KPI-remove modal that
    still uses it) and forced the action row + every button label to nowrap so all three
    buttons stay single-line at any theme/zoom. */
-#wizardNavConfirmPanel{width:460px;}
-#wizardNavConfirmPanel .widget-remove-confirm-actions{flex-wrap:nowrap;}
+/* Round 130: up to 5 buttons can now show at once (Cancel / Save current view / Go to
+   saved views / Open in New Tab / Leave) -- widened further and switched the action row
+   from a forced single line (flex-wrap:nowrap) to wrapping onto a second line when needed,
+   still right-aligned, rather than trying to squeeze 5 nowrap labels into one row. */
+#wizardNavConfirmPanel{width:520px;max-width:92vw;}
+#wizardNavConfirmPanel .widget-remove-confirm-actions{flex-wrap:wrap;row-gap:8px;}
 #wizardNavConfirmPanel .widget-remove-confirm-cancel,
+#wizardNavConfirmPanel .wizard-nav-confirm-save,
+#wizardNavConfirmPanel .wizard-nav-confirm-goto-saved,
 #wizardNavConfirmPanel .wizard-nav-confirm-newtab,
 #wizardNavConfirmPanel .widget-remove-confirm-remove{white-space:nowrap;}
 
@@ -2882,9 +2904,11 @@ body.mode-performance #performanceRoot > .view{ grid-column:span 12; min-width:0
   <div class="widget-remove-confirm-backdrop" id="wizardNavConfirmBackdrop"></div>
   <div class="widget-remove-confirm-panel" id="wizardNavConfirmPanel">
     <p class="wizard-nav-confirm-title">Are you sure you want to go back to the Setup Wizard?</p>
-    <p class="wizard-nav-confirm-sub">You will lose your current progress in this dashboard.</p>
+    <p class="wizard-nav-confirm-sub">You will lose your current progress in this dashboard unless you save it first.</p>
     <div class="widget-remove-confirm-actions">
       <button type="button" id="wizardNavConfirmCancel" class="widget-remove-confirm-cancel">Cancel</button>
+      <button type="button" id="wizardNavConfirmSave" class="wizard-nav-confirm-save" style="display:none">Save current view</button>
+      <button type="button" id="wizardNavConfirmGoToSaved" class="wizard-nav-confirm-goto-saved" style="display:none">Go to saved views</button>
       <button type="button" id="wizardNavConfirmNewTab" class="wizard-nav-confirm-newtab">Open in New Tab</button>
       <button type="button" id="wizardNavConfirmLeave" class="widget-remove-confirm-remove">Leave</button>
     </div>
@@ -16527,6 +16551,15 @@ function closeWizard(){
 // wizard" button) is left calling openWizard() directly, since there's no dashboard progress
 // to lose from an empty placeholder screen.
 function openWizardNavConfirm(){
+  // Round 130: "Save current view" and "Go to saved views" only make sense once a backend
+  // is actually there to save to (SAVED_VIEWS_AVAILABLE) -- both stay hidden (their default
+  // in the static markup) on a standalone/no-backend copy of this file, same gating as the
+  // dashboard's own 💾 FAB and the wizard's "My saved views" entry. "Go to saved views"
+  // additionally needs at least one saved view to go to.
+  const saveBtn = $("wizardNavConfirmSave");
+  const gotoBtn = $("wizardNavConfirmGoToSaved");
+  if(saveBtn) saveBtn.style.display = SAVED_VIEWS_AVAILABLE ? "" : "none";
+  if(gotoBtn) gotoBtn.style.display = (SAVED_VIEWS_AVAILABLE && SAVED_VIEWS_CACHE && SAVED_VIEWS_CACHE.length>0) ? "" : "none";
   $("wizardNavConfirmOverlay").classList.add("show");
   $("main").classList.add("blurred-behind");
 }
@@ -18291,6 +18324,26 @@ function bootstrap(){
     if(e.target.closest("#wizardNavConfirmNewTab")){
       window.open(window.location.href, "_blank", "noopener");
       closeWizardNavConfirm();
+      return;
+    }
+    // Round 130: "Save current view" -- same experience as the dashboard's own 💾 FAB
+    // (openSavedViewsModal(), pre-filled with the "save current view" section since there's
+    // a live dashboard to save) -- just closes THIS confirm first so the two overlays don't
+    // stack. Does not touch WZ/openWizard() at all: the user isn't leaving, just saving.
+    if(e.target.closest("#wizardNavConfirmSave")){
+      closeWizardNavConfirm();
+      openSavedViewsModal();
+      return;
+    }
+    // "Go to saved views" -- the same underlying action as Leave (this dashboard's progress
+    // IS being left behind, exactly like the plain Leave button), but instead of landing on
+    // the wizard's blank branch-choice screen, it opens straight into the same saved-views
+    // list the wizard's own "My saved views" link shows -- for someone who already knows
+    // they want to jump to a DIFFERENT saved view, not start fresh.
+    if(e.target.closest("#wizardNavConfirmGoToSaved")){
+      closeWizardNavConfirm();
+      openWizard();
+      openSavedViewsModal();
       return;
     }
     if(e.target.closest("#wizardNavConfirmLeave")){
