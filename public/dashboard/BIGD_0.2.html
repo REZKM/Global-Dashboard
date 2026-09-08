@@ -678,16 +678,16 @@ table.datatable a.mtext{color:var(--text);}
   font-size:13px;font-weight:700;cursor:pointer;padding:0;text-align:left;
 }
 .wiz-saved-views-link:hover{text-decoration:underline;}
-.saved-view-row{display:flex;align-items:stretch;gap:8px;margin-bottom:8px;}
-.saved-view-restore{
-  flex:1;text-align:left;background:var(--neutral-soft);border:none;border-radius:8px;
-  padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;
-}
-.saved-view-restore b{font-size:13px;color:var(--text);}
-.saved-view-restore span{font-size:11px;color:var(--text-muted);}
+/* Round 131: each saved view is now a numbered .export-option-card (the same reusable
+   radio-card look Export options and the Benchmarking type chooser already use), not a
+   plain button -- .saved-view-row just lays that card next to its own delete "x", and
+   .saved-view-card only needs to cancel .export-option-card's own margin-bottom (the row
+   wrapper provides its own spacing instead). */
+.saved-view-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;}
+.saved-view-card{flex:1;margin-bottom:0;}
 .saved-view-delete{
   background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;
-  padding:4px 10px;border-radius:8px;
+  padding:4px 10px;border-radius:8px;flex-shrink:0;
 }
 .saved-view-delete:hover{color:#ef4444;background:var(--neutral-soft);}
 
@@ -1809,37 +1809,36 @@ body.mode-performance #performanceRoot .grid-kpi .card.kpi .widget-head-row .lab
   background:var(--accent);color:#fff;
 }
 .wizard-nav-confirm-newtab:hover{background:var(--accent-dark);}
-/* Round 130: "Save current view" (safe, non-destructive -- styled like the existing accent
-   "Open in New Tab" button) and "Go to saved views" (a neutral secondary action, like
-   Cancel) on the same confirm dialog. Both default to display:none in the static markup
-   and are only revealed by openWizardNavConfirm() once SAVED_VIEWS_AVAILABLE (and, for
-   "Go to saved views", a non-empty SAVED_VIEWS_CACHE) confirm there's a backend/saved view
-   to act on. */
+/* Round 131: replaced Round 130's "cram 5 buttons into one row" layout (which wrapped
+   awkwardly) with a dedicated callout box for the two saved-views actions, sitting ABOVE
+   the original 3-button decision row -- that row (Cancel/Open in New Tab/Leave) goes back
+   to looking exactly like it did before Round 130 (see the Round 88 comment just below) when
+   there's no backend at all, since the box simply doesn't render.  */
+.wizard-nav-confirm-saved-box{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  background:var(--neutral-soft);border:1px solid var(--card-border);border-radius:10px;
+  padding:12px 14px;margin:0 0 18px;
+}
 .wizard-nav-confirm-save{
   border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;
-  background:var(--accent);color:#fff;
+  background:var(--accent);color:#fff;white-space:nowrap;
 }
 .wizard-nav-confirm-save:hover{background:var(--accent-dark);}
 .wizard-nav-confirm-goto-saved{
   border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;
-  background:var(--neutral-soft);color:var(--text);
+  background:var(--card-bg);color:var(--text);border:1px solid var(--card-border);white-space:nowrap;
 }
-.wizard-nav-confirm-goto-saved:hover{background:var(--card-border);}
+.wizard-nav-confirm-goto-saved:hover{border-color:var(--accent);color:var(--accent);}
 /* Round 88: at the shared .widget-remove-confirm-panel's own 340px width, "Open in New Tab"
    (the longest of the 3 button labels here, unlike the 2-button KPI-remove modal's short
    Cancel/Remove) wrapped onto two lines. Widened just THIS panel via its id (id beats the
    shared class's own width:340px, no need to touch that class or the KPI-remove modal that
    still uses it) and forced the action row + every button label to nowrap so all three
-   buttons stay single-line at any theme/zoom. */
-/* Round 130: up to 5 buttons can now show at once (Cancel / Save current view / Go to
-   saved views / Open in New Tab / Leave) -- widened further and switched the action row
-   from a forced single line (flex-wrap:nowrap) to wrapping onto a second line when needed,
-   still right-aligned, rather than trying to squeeze 5 nowrap labels into one row. */
-#wizardNavConfirmPanel{width:520px;max-width:92vw;}
-#wizardNavConfirmPanel .widget-remove-confirm-actions{flex-wrap:wrap;row-gap:8px;}
+   buttons stay single-line at any theme/zoom. Round 131: widened slightly further (480px)
+   since the saved-views box above it can otherwise look cramped at exactly 460px. */
+#wizardNavConfirmPanel{width:480px;max-width:92vw;}
+#wizardNavConfirmPanel .widget-remove-confirm-actions{flex-wrap:nowrap;}
 #wizardNavConfirmPanel .widget-remove-confirm-cancel,
-#wizardNavConfirmPanel .wizard-nav-confirm-save,
-#wizardNavConfirmPanel .wizard-nav-confirm-goto-saved,
 #wizardNavConfirmPanel .wizard-nav-confirm-newtab,
 #wizardNavConfirmPanel .widget-remove-confirm-remove{white-space:nowrap;}
 
@@ -2905,10 +2904,12 @@ body.mode-performance #performanceRoot > .view{ grid-column:span 12; min-width:0
   <div class="widget-remove-confirm-panel" id="wizardNavConfirmPanel">
     <p class="wizard-nav-confirm-title">Are you sure you want to go back to the Setup Wizard?</p>
     <p class="wizard-nav-confirm-sub">You will lose your current progress in this dashboard unless you save it first.</p>
+    <div class="wizard-nav-confirm-saved-box" id="wizardNavConfirmSavedBox" style="display:none">
+      <button type="button" id="wizardNavConfirmSave" class="wizard-nav-confirm-save">Save current view</button>
+      <button type="button" id="wizardNavConfirmGoToSaved" class="wizard-nav-confirm-goto-saved" style="display:none">Go to saved views</button>
+    </div>
     <div class="widget-remove-confirm-actions">
       <button type="button" id="wizardNavConfirmCancel" class="widget-remove-confirm-cancel">Cancel</button>
-      <button type="button" id="wizardNavConfirmSave" class="wizard-nav-confirm-save" style="display:none">Save current view</button>
-      <button type="button" id="wizardNavConfirmGoToSaved" class="wizard-nav-confirm-goto-saved" style="display:none">Go to saved views</button>
       <button type="button" id="wizardNavConfirmNewTab" class="wizard-nav-confirm-newtab">Open in New Tab</button>
       <button type="button" id="wizardNavConfirmLeave" class="widget-remove-confirm-remove">Leave</button>
     </div>
@@ -16162,6 +16163,12 @@ function __setSavedViewsStateForTests(available, cache){
 function __getSavedViewsStateForTests(){
   return { available: SAVED_VIEWS_AVAILABLE, cache: SAVED_VIEWS_CACHE };
 }
+// Test-only: simulates "the user already picked a radio option" without needing a real
+// qsa()-bound change event (which, like every other delegated/scoped listener in this file,
+// can't be triggered through the mock test harness). Never called from real app code.
+function __setSavedViewsSelectedIdForTests(id){
+  SAVED_VIEWS_SELECTED_ID = id;
+}
 
 async function checkSavedViewsAvailable(){
   if(SAVED_VIEWS_AVAILABLE!==null) return SAVED_VIEWS_AVAILABLE;
@@ -16273,26 +16280,89 @@ function closeSavedViewsModal(){
   if(ov) ov.classList.remove("show");
 }
 
-function savedViewsListItemHTML(v){
-  return `<div class="saved-view-row" data-id="${esc(v.id)}">
-    <button type="button" class="saved-view-restore" data-id="${esc(v.id)}">
-      <b dir="auto">${esc(v.name)}</b><span>Updated ${esc(formatDatePretty(dayOf(v.updated_at)))}</span>
-    </button>
+// Round 131: numbered, radio-selectable cards -- reuses the exact same .export-option-card
+// visual (border/active-highlight/hover) the Export options popup and the Benchmarking type
+// chooser already share, per the explicit "match the export popup" request, instead of the
+// plain button-row look Round 129 shipped with.
+function savedViewsListItemHTML(v, index, selectedId){
+  const isActive = String(selectedId)===String(v.id);
+  return `<div class="saved-view-row">
+    <label class="export-option-card saved-view-card${isActive?' active':''}">
+      <input type="radio" name="savedViewPick" value="${esc(v.id)}" class="saved-view-radio" data-id="${esc(v.id)}" ${isActive?'checked':''}>
+      <div><b dir="auto">${index+1}. ${esc(v.name)}</b><div class="sub">Updated ${esc(formatDatePretty(dayOf(v.updated_at)))}</div></div>
+    </label>
     <button type="button" class="saved-view-delete" data-id="${esc(v.id)}" title="Delete this saved view">&times;</button>
   </div>`;
 }
 
-function renderSavedViewsModalBody(loading){
-  const hasCurrent = !!(STATE.listening || STATE.performance || STATE.quickPerf);
+// Which saved view is currently selected in the list (radio-picked but not yet confirmed) --
+// reset to null on every full re-render (a fresh open, or after a save/delete changes the
+// list), matching the plain "nothing picked yet" starting state.
+let SAVED_VIEWS_SELECTED_ID = null;
+
+// Round 131: rebuilds ONLY the list + its "Go to that view" footer from the already-cached
+// SAVED_VIEWS_CACHE (no network round trip) -- used both for the initial full render and for
+// every selection change, so picking a different radio doesn't need to re-fetch anything.
+function renderSavedViewsListAndFooter(loading){
   const list = SAVED_VIEWS_CACHE;
   const listHtml = loading
     ? `<p class="sub">Loading your saved views…</p>`
     : (!list ? `<p class="sub">Couldn't load your saved views. Check your connection and try again.</p>`
       : (list.length===0 ? `<p class="sub">You haven't saved any views yet.</p>`
-        : list.map(savedViewsListItemHTML).join("")));
+        : list.map((v,i)=>savedViewsListItemHTML(v,i,SAVED_VIEWS_SELECTED_ID)).join("")));
+  const hasList = !loading && list && list.length>0;
+  const listEl = $("savedViewsList");
+  if(listEl) listEl.innerHTML = listHtml;
+  const footerEl = $("savedViewsFooter");
+  if(footerEl) footerEl.innerHTML = hasList
+    ? `<div class="export-popup-actions"><button type="button" class="btn accent" id="savedViewGoBtn" ${SAVED_VIEWS_SELECTED_ID?"":"disabled"}>Go to that view</button></div>`
+    : "";
+  bindSavedViewsListEvents();
+}
+
+function bindSavedViewsListEvents(){
+  qsa(".saved-view-radio", $("savedViewsBody")).forEach(radio=>{
+    radio.addEventListener("change", ()=>{
+      SAVED_VIEWS_SELECTED_ID = radio.dataset.id;
+      renderSavedViewsListAndFooter(false);
+    });
+  });
+  qsa(".saved-view-delete", $("savedViewsBody")).forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.dataset.id;
+      btn.disabled = true;
+      try{
+        await deleteSavedViewFromServer(id);
+        if(String(SAVED_VIEWS_SELECTED_ID)===String(id)) SAVED_VIEWS_SELECTED_ID = null;
+        await refreshSavedViewsCache();
+        renderSavedViewsListAndFooter(false);
+      }catch(err){
+        toast(err.message || "Couldn't delete this view.");
+        btn.disabled = false;
+      }
+    });
+  });
+  const goBtn = $("savedViewGoBtn");
+  if(goBtn) goBtn.addEventListener("click", async ()=>{
+    if(!SAVED_VIEWS_SELECTED_ID) return;
+    goBtn.disabled = true; goBtn.textContent = "Loading…";
+    try{
+      const view = await fetchSavedViewFull(SAVED_VIEWS_SELECTED_ID);
+      closeSavedViewsModal();
+      applyRestoredViewState(view.state);
+    }catch(e){
+      toast(e.message || "Couldn't load this view.");
+      goBtn.disabled = false; goBtn.textContent = "Go to that view";
+    }
+  });
+}
+
+function renderSavedViewsModalBody(loading){
+  const hasCurrent = !!(STATE.listening || STATE.performance || STATE.quickPerf);
+  SAVED_VIEWS_SELECTED_ID = null;
   $("savedViewsBody").innerHTML = `
     <h2 style="margin:0 0 4px;font-size:17px">My saved views</h2>
-    <p class="modalsub">Save your current filters and data, or jump back into a view you saved earlier.</p>
+    <p class="modalsub">Save your current filters and data, or select a view you saved earlier and go to it.</p>
     ${hasCurrent ? `
       <div class="formgroup">
         <label>Save the current view</label>
@@ -16301,7 +16371,8 @@ function renderSavedViewsModalBody(loading){
       </div>
       <hr style="border:none;border-top:1px solid var(--card-border);margin:18px 0">
     ` : ""}
-    <div id="savedViewsList">${listHtml}</div>
+    <div id="savedViewsList"></div>
+    <div id="savedViewsFooter"></div>
   `;
   const saveBtn = $("savedViewSaveBtn");
   if(saveBtn) saveBtn.addEventListener("click", async ()=>{
@@ -16312,41 +16383,16 @@ function renderSavedViewsModalBody(loading){
     try{
       await saveCurrentViewToServer(name);
       toast("View saved.");
+      if(input) input.value = "";
       await refreshSavedViewsCache();
-      renderSavedViewsModalBody(false);
+      renderSavedViewsListAndFooter(false);
     }catch(e){
       toast(e.message || "Couldn't save this view.");
+    }finally{
       saveBtn.disabled = false; saveBtn.textContent = "Save current view";
     }
   });
-  qsa(".saved-view-restore", $("savedViewsBody")).forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      const id = btn.dataset.id;
-      btn.disabled = true;
-      try{
-        const view = await fetchSavedViewFull(id);
-        closeSavedViewsModal();
-        applyRestoredViewState(view.state);
-      }catch(e){
-        toast(e.message || "Couldn't load this view.");
-        btn.disabled = false;
-      }
-    });
-  });
-  qsa(".saved-view-delete", $("savedViewsBody")).forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      const id = btn.dataset.id;
-      btn.disabled = true;
-      try{
-        await deleteSavedViewFromServer(id);
-        await refreshSavedViewsCache();
-        renderSavedViewsModalBody(false);
-      }catch(err){
-        toast(err.message || "Couldn't delete this view.");
-        btn.disabled = false;
-      }
-    });
-  });
+  renderSavedViewsListAndFooter(loading);
 }
 
 async function openSavedViewsModal(){
@@ -16551,14 +16597,15 @@ function closeWizard(){
 // wizard" button) is left calling openWizard() directly, since there's no dashboard progress
 // to lose from an empty placeholder screen.
 function openWizardNavConfirm(){
-  // Round 130: "Save current view" and "Go to saved views" only make sense once a backend
-  // is actually there to save to (SAVED_VIEWS_AVAILABLE) -- both stay hidden (their default
-  // in the static markup) on a standalone/no-backend copy of this file, same gating as the
-  // dashboard's own 💾 FAB and the wizard's "My saved views" entry. "Go to saved views"
-  // additionally needs at least one saved view to go to.
-  const saveBtn = $("wizardNavConfirmSave");
+  // Round 130/131: the saved-views callout box (Save current view / Go to saved views) only
+  // makes sense once a backend is actually there to save to (SAVED_VIEWS_AVAILABLE) -- it
+  // stays hidden entirely (its default in the static markup) on a standalone/no-backend copy
+  // of this file, same gating as the dashboard's own 💾 FAB and the wizard's "My saved
+  // views" entry -- in which case the dialog looks exactly like it did pre-Round-130.
+  // "Go to saved views" specifically also needs at least one saved view to go to.
+  const box = $("wizardNavConfirmSavedBox");
   const gotoBtn = $("wizardNavConfirmGoToSaved");
-  if(saveBtn) saveBtn.style.display = SAVED_VIEWS_AVAILABLE ? "" : "none";
+  if(box) box.style.display = SAVED_VIEWS_AVAILABLE ? "flex" : "none";
   if(gotoBtn) gotoBtn.style.display = (SAVED_VIEWS_AVAILABLE && SAVED_VIEWS_CACHE && SAVED_VIEWS_CACHE.length>0) ? "" : "none";
   $("wizardNavConfirmOverlay").classList.add("show");
   $("main").classList.add("blurred-behind");
