@@ -39,7 +39,10 @@ if (!process.env.SESSION_SECRET) {
 }
 
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+// Saved views can carry a full dataset snapshot (see "Saved views API" below),
+// which can run into the low single-digit megabytes as JSON -- well past
+// express.json()'s 100kb default limit -- so this is raised accordingly.
+app.use(express.json({ limit: '25mb' }));
 
 app.use(
   cookieSession({
@@ -60,6 +63,11 @@ function requireAuth(req, res, next) {
   console.log(`[requireAuth] path=${req.path} hasSession=${!!req.session} userEmail=${req.session && req.session.userEmail}`);
   if (req.session && req.session.userEmail) return next();
   return res.redirect('/login');
+}
+
+function requireApiAuth(req, res, next) {
+  if (req.session && req.session.userEmail) return next();
+  return res.status(401).json({ error: 'Not logged in.' });
 }
 
 function render(res, view, replacements = {}) {
@@ -166,6 +174,80 @@ app.post('/enter-password', asyncHandler(async (req, res) => {
   res.redirect('/dashboard');
 }));
 
+// ---------------------------------------------------------------------------
+// Saved views API -- used by the dashboard's own JS (BIGD_0.2.html) to let a
+// signed-in user save their current dashboard (filters, active tab, AND the
+// loaded dataset -- the same snapshot shape the dashboard already builds for
+// its "Download standalone HTML" feature) and restore it on a later visit,
+// from any device, without re-uploading anything.
+//
+// Every route below is scoped to req.session.userEmail -- taken from the
+// caller's own authenticated session, never from a client-supplied field --
+// so one user can never list, read, overwrite, or delete another user's
+// saved view, even by guessing an id (db.js's queries all filter by email
+// too, as a second layer of the same guarantee).
+// ---------------------------------------------------------------------------
+const MAX_VIEW_NAME_LENGTH = 120;
+
+function cleanViewName(raw) {
+  return String(raw || '').trim().slice(0, MAX_VIEW_NAME_LENGTH);
+}
+
+app.get('/api/me', requireApiAuth, (req, res) => {
+  res.json({ email: req.session.userEmail });
+});
+
+app.get('/api/views', requireApiAuth, asyncHandler(async (req, res) => {
+  const views = await db.listViews(req.session.userEmail);
+  res.json({ views });
+}));
+
+app.post('/api/views', requireApiAuth, asyncHandler(async (req, res) => {
+  const name = cleanViewName(req.body.name);
+  const state = req.body.state;
+  if (!name) return res.status(400).json({ error: 'A view name is required.' });
+  if (!state || typeof state !== 'object') return res.status(400).json({ error: 'Missing view state.' });
+
+  const count = await db.countViews(req.session.userEmail);
+  if (count >= db.MAX_VIEWS_PER_USER) {
+    return res.status(400).json({
+      error: `You've reached the limit of ${db.MAX_VIEWS_PER_USER} saved views. Delete one first.`,
+    });
+  }
+
+  const view = await db.createView(req.session.userEmail, name, state);
+  res.json({ view });
+}));
+
+app.get('/api/views/:id', requireApiAuth, asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.' });
+  const view = await db.getView(id, req.session.userEmail);
+  if (!view) return res.status(404).json({ error: 'View not found.' });
+  res.json({ view });
+}));
+
+app.put('/api/views/:id', requireApiAuth, asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.' });
+  const name = cleanViewName(req.body.name);
+  const state = req.body.state;
+  if (!name) return res.status(400).json({ error: 'A view name is required.' });
+  if (!state || typeof state !== 'object') return res.status(400).json({ error: 'Missing view state.' });
+
+  const view = await db.updateView(id, req.session.userEmail, name, state);
+  if (!view) return res.status(404).json({ error: 'View not found.' });
+  res.json({ view });
+}));
+
+app.delete('/api/views/:id', requireApiAuth, asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.' });
+  const deleted = await db.deleteView(id, req.session.userEmail);
+  if (!deleted) return res.status(404).json({ error: 'View not found.' });
+  res.json({ ok: true });
+}));
+
 app.get('/logout', (req, res) => {
   req.session = null;
   res.redirect('/login');
@@ -194,7 +276,14 @@ app.get('/', (req, res) => {
 // Catches anything passed to next(err) — e.g. a temporary database hiccup
 // during a request — and returns a normal error page instead of crashing.
 app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') {
+    console.warn('Request body too large:', err.message);
+    const message = 'That saved view is too large to store (over the 25MB limit).';
+    if (req.path.startsWith('/api/')) return res.status(413).json({ error: message });
+    return res.status(413).send(message);
+  }
   console.error('Request failed:', err);
+  if (req.path.startsWith('/api/')) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
   res.status(500).send('Something went wrong. Please try again.');
 });
 

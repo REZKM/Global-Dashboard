@@ -662,6 +662,35 @@ table.datatable a.mtext{color:var(--text);}
 [dir="rtl"] #adminFab{right:auto;left:22px;}
 #adminFab:hover{background:var(--accent);}
 
+/* Round 129: Saved Views -- a second FAB next to the setup-wizard gear, shown only once
+   checkSavedViewsAvailable() confirms a backend is actually present (see bootstrap()) --
+   stays display:none (its default in the injected markup) on a standalone/no-backend copy
+   of this file. */
+#savedViewsFab{
+  position:fixed;bottom:22px;right:80px;width:48px;height:48px;border-radius:50%;
+  background:var(--ink);color:#fff;border:none;font-size:19px;box-shadow:0 4px 16px rgba(0,0,0,.25);
+  align-items:center;justify-content:center;z-index:500;
+}
+[dir="rtl"] #savedViewsFab{right:auto;left:80px;}
+#savedViewsFab:hover{background:var(--accent);}
+.wiz-saved-views-link{
+  display:block;margin:0 0 16px;background:none;border:none;color:var(--accent);
+  font-size:13px;font-weight:700;cursor:pointer;padding:0;text-align:left;
+}
+.wiz-saved-views-link:hover{text-decoration:underline;}
+.saved-view-row{display:flex;align-items:stretch;gap:8px;margin-bottom:8px;}
+.saved-view-restore{
+  flex:1;text-align:left;background:var(--neutral-soft);border:none;border-radius:8px;
+  padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;
+}
+.saved-view-restore b{font-size:13px;color:var(--text);}
+.saved-view-restore span{font-size:11px;color:var(--text-muted);}
+.saved-view-delete{
+  background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;
+  padding:4px 10px;border-radius:8px;
+}
+.saved-view-delete:hover{color:#ef4444;background:var(--neutral-soft);}
+
 /* Round 98: Vertical Dot Navigation -- fixed, right-edge, vertically-centered scrollspy dots
    mirroring the sidebar's own section list. Sits above #adminFab (z-index 500) but well below
    every modal/overlay (which all use z-index >=1850), so an opened overlay always covers it as
@@ -1894,6 +1923,25 @@ body.mode-performance #performanceRoot .grid-kpi .card.kpi .widget-head-row .lab
 .dd-post-meta{font-size:11px;color:var(--text-muted);margin-bottom:8px;}
 .dd-post-stats{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--text-muted);}
 .dd-post-stats b{color:var(--text);}
+/* Round 125: KPI-card-value drilldown -- the metric that explains why a post is sorted
+   where it is, visually distinguished from the rest of that same post's metric list. */
+.dd-post-stats .dd-stat-highlight{background:var(--accent-soft);color:var(--accent-dark);
+  border-radius:6px;padding:2px 7px;font-weight:700;}
+.dd-post-stats .dd-stat-highlight b{color:var(--accent-dark);}
+/* Round 127: media type + content type badges, shown on the same line as the post's
+   metrics but pushed to the opposite (right) edge of the row -- only applied where the
+   .dd-post-stats-split modifier is present (the KPI-value drilldown's own post cards),
+   so the pre-existing Posting Timeline drilldown's plain metrics row is left untouched. */
+.dd-post-stats-split{justify-content:space-between;align-items:flex-start;flex-wrap:wrap;}
+.dd-post-stats-metrics{display:flex;flex-wrap:wrap;gap:10px;flex:1 1 auto;}
+.dd-post-type-badges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;flex:0 0 auto;margin-left:auto;}
+.dd-type-badge{padding:2px 9px;border-radius:999px;font-weight:700;white-space:nowrap;font-size:11px;}
+/* A KPI card's own value is now clickable (opens the timeline/drilldown panel) -- give it
+   a pointer cursor so that's discoverable. The ERF%/ER%/ERi% card DOES carry
+   data-kpi-key="engagement_rate" (see erKpiTileHTML()) but isn't part of
+   KPI_DRILLDOWN_METRIC_KEYS -- openKpiDrilldown() no-ops for it -- so it's excluded here
+   too, rather than showing a pointer cursor that leads nowhere. */
+.card.kpi[data-kpi-key]:not([data-kpi-key="engagement_rate"]) .value{cursor:pointer;}
 
 .dd-filter-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
 .dd-sort-label{font-size:12px;font-weight:600;color:var(--text-muted);margin-right:-4px;}
@@ -7244,7 +7292,11 @@ function paintMiniChart(kind, canvasId, rows, opts, entityColor, platformColorMa
 const KPI_METRIC_LABELS = {
   posts:"Posts", reach:"Reach", impressions:"Impressions", engagement:"Engagements",
   avg_engagement:"Avg engagements / post", likes:"Reactions", comments:"Comments", shares:"Shares",
-  video_views:"Video views", followers:"Profile followers"
+  video_views:"Video views", followers:"Profile followers",
+  // Round 125: metricLabel("stories") is now actually called (the KPI-drilldown panel's own
+  // title) -- previously nothing ever passed "stories" through metricLabel(), so this was
+  // simply never reached before; harmless/additive here since nothing else references it.
+  stories:"Total stories"
 };
 
 /* ============================================================
@@ -7705,6 +7757,302 @@ function kpiCompareBtnHTML(metricKey, title, kind){
   return inner ? `<div class="kpi-compare-mini-row">${inner}</div>` : "";
 }
 
+/* ============================================================
+   ROUND 125: KPI CARD VALUE -> TIMELINE + POST DRILLDOWN
+   Clicking directly on a main-dashboard KPI card's own value (not its B/P mini buttons)
+   opens the SAME shared side panel the B/P buttons already use (#widgetCompareOverlay /
+   #widgetCompareBody) -- same panel, same visual chrome/behavior, per explicit request --
+   but with different content: a single-metric line-chart timeline (daily/weekly/monthly,
+   zero-filled across the whole dashboard date range, same D/W/M toggle as Posting
+   Timeline), and clicking a point on that chart shows that period's posts underneath,
+   within this same panel, sorted by whichever metric explains why each post is there.
+   Scoped to the 10 plain, per-day-summable KPI cards (posts/stories/engagement/
+   avg_engagement/reach/impressions/likes/comments/shares/video_views) -- the unified ERF%/
+   ER%/ERi% card and the "Leading brand"/"Dominant media/content type" summary cards are
+   excluded (none of them carry a data-kpi-key attribute -- see renderPerfOverview's
+   kpiTile() -- so this feature simply never triggers for them).
+   ============================================================ */
+const KPI_DRILLDOWN_METRIC_KEYS = ["posts","stories","engagement","avg_engagement","reach","impressions","likes","comments","shares","video_views"];
+// Per-row value contributed to the KPI's own daily total -- "posts" contributes 1 per row,
+// "reach" contributes that row's own reach figure, etc. "engagement" (and avg_engagement,
+// which shares the same numerator) always goes through engagementValueOf() so it stays
+// correct under the Total Interactions/Engagements toggle, like every other engagement
+// figure on this dashboard.
+function kpiDrilldownValueFn(metricKey){
+  switch(metricKey){
+    case "posts": return ()=>1;
+    case "stories": return (r)=> isStoryRow(r) ? 1 : 0;
+    case "engagement": case "avg_engagement": return (r)=> engagementValueOf(r);
+    case "reach": return (r)=> Number(r.reach)||0;
+    case "impressions": return (r)=> Number(r.impressions)||0;
+    case "likes": return (r)=> Number(r.likes)||0;
+    case "comments": return (r)=> Number(r.comments)||0;
+    case "shares": return (r)=> Number(r.shares)||0;
+    case "video_views": return (r)=> Number(r.video_views)||0;
+    default: return ()=>0;
+  }
+}
+// Generic day-keyed sum of any per-row value function -- the same "group by dayOf(), skip
+// unknown dates" shape aggregatePerformanceRows() already uses for dailyPostsTotal/
+// dailyInteractionsTotal, parameterized so it works for every KPI key, not only those two.
+function computeKpiDailyMap(rows, valueFn){
+  const map = {};
+  (rows||[]).forEach(r=>{
+    const d = dayOf(r.date);
+    if(d==="unknown") return;
+    map[d] = (map[d]||0) + valueFn(r);
+  });
+  return map;
+}
+// The chart's own data series: every bucket across the full dashboard date range (via
+// enumerateBucketKeys, the same helper Posting Timeline uses), zero-filled for any bucket
+// with no matching rows -- "stick to dashboard date range, fill empty days with zeros" per
+// explicit spec. avg_engagement is the one exception that isn't a plain per-bucket sum: it's
+// that bucket's own engagement total divided by that bucket's own post count (a real
+// per-bucket average), 0 when a bucket has no posts at all.
+function computeKpiDrilldownSeries(rows, metricKey, dateFrom, dateTo, granularity){
+  const buckets = (dateFrom && dateTo) ? enumerateBucketKeys(dateFrom, dateTo, granularity) : [];
+  const dailyMap = computeKpiDailyMap(rows, kpiDrilldownValueFn(metricKey));
+  const bucketMap = bucketDailyMap(dailyMap, granularity);
+  if(metricKey==="avg_engagement"){
+    const dailyPosts = computeKpiDailyMap(rows, ()=>1);
+    const bucketPosts = bucketDailyMap(dailyPosts, granularity);
+    return { buckets, values: buckets.map(b=> bucketPosts[b] ? (bucketMap[b]||0)/bucketPosts[b] : 0) };
+  }
+  return { buckets, values: buckets.map(b=> bucketMap[b]||0) };
+}
+// "Sort the posts from largest to smallest based on the selected KPI metric -- except for
+// number of posts KPI card, sort automatically by total interactions/eng." Posts/Stories
+// aren't themselves a per-post field (a single post is always "1 post"), and avg_engagement
+// is a per-bucket ratio, not a per-post value either -- all three fall back to the post's own
+// engagement figure, the only thing that actually varies post-to-post for them.
+function kpiDrilldownSortKeyFor(metricKey){
+  if(metricKey==="posts" || metricKey==="stories" || metricKey==="avg_engagement") return "engagement";
+  return metricKey;
+}
+// Same flattened per-post shape renderDayDrilldownBody() already builds (for visual/
+// behavioral consistency with that existing drilldown), plus a `_raw` back-reference to the
+// original row -- needed so kpiDrilldownPostMetricsHTML() can call
+// engagementsComponentsFor()/interactionsComponentsFor() (which read raw column names this
+// flattened shape doesn't carry, e.g. swipe_ups/insights_reactions) without re-deriving them.
+function computeKpiDrilldownPosts(rows, metricKey){
+  const sortKey = kpiDrilldownSortKeyFor(metricKey);
+  const posts = (rows||[]).map(r=>({
+    _raw:r,
+    profile:r.profile||"Unknown", platform:r.platform||"Unknown", date:r.date,
+    caption:r.caption||"", permalink:r.permalink||"",
+    media_type:r.media_type||"", content_type:r.content_type||"",
+    likes:Number(r.likes)||0, comments:Number(r.comments)||0, shares:Number(r.shares)||0,
+    saves:Number(r.saves)||0, post_clicks:Number(r.post_clicks)||0,
+    reach:Number(r.reach)||0, impressions:Number(r.impressions)||0, video_views:Number(r.video_views)||0,
+    engagement: engagementValueOf(r)
+  }));
+  return posts.sort((a,b)=>(b[sortKey]||0)-(a[sortKey]||0));
+}
+// The standard fallback metric set shown (with the opened KPI's own one highlighted) for
+// every card OTHER than Engagements/Total Interactions/Posts/Stories/Avg-per-post -- Reach,
+// Impressions, Likes, Comments, Shares, Video views (same fields renderDayDrilldownBody()
+// already shows per post).
+const KPI_DRILLDOWN_DEFAULT_METRICS = [
+  ["likes","Likes"], ["comments","Comments"], ["shares","Shares"],
+  ["reach","Reach"], ["impressions","Impressions"], ["video_views","Video views"]
+];
+// Per explicit spec: "highlight the metric corresponding to the KPI card that was opened,"
+// plus, specifically for Engagements/Total Interactions (and, by the same "sort by total
+// interactions/eng" rule, Posts/Stories/Avg-per-post too): "For Engagements: show the full
+// list of engagement metrics available according to platform. For Total Interactions: show
+// Likes, Shares, Comments." engagementsComponentsFor()/interactionsComponentsFor() (already
+// used by the Engagement/Interactions Split widget for this exact platform-aware breakdown)
+// are reused here unchanged, on the post's original raw row, so each platform's own real
+// component list shows up automatically with no per-platform logic duplicated here.
+function kpiDrilldownPostMetricsHTML(post, metricKey){
+  if(metricKey==="engagement" || metricKey==="posts" || metricKey==="stories" || metricKey==="avg_engagement"){
+    const totalSpan = `<span class="dd-stat-highlight"><b>${fmt(post.engagement)}</b> ${esc(engagementMetricLabel().toLowerCase())}</span>`;
+    let breakdownSpans;
+    if(engagementMetricMode()==="engagements"){
+      const comps = engagementsComponentsFor(post._raw)||[];
+      breakdownSpans = comps.length
+        ? comps.map(([label,val])=>`<span>${fmt(val)} ${esc(label)}</span>`).join("")
+        : `<span class="foot">No engagement components reported for this platform.</span>`;
+    } else {
+      breakdownSpans = `<span>${fmt(post.likes)} likes</span><span>${fmt(post.shares)} shares</span><span>${fmt(post.comments)} comments</span>`;
+    }
+    return totalSpan + breakdownSpans;
+  }
+  // Round 126: every other KPI card's per-post metrics list now also LEADS with the post's
+  // own Total Interactions/Engagements figure (whichever the dashboard's current engagement-
+  // metric toggle selects) -- not highlighted here (this branch's highlight belongs to
+  // metricKey's own field below), just always-present, always-first context for every post,
+  // per explicit request.
+  const leadSpan = `<span><b>${fmt(post.engagement)}</b> ${esc(engagementMetricLabel().toLowerCase())}</span>`;
+  return leadSpan + KPI_DRILLDOWN_DEFAULT_METRICS.map(([key,label])=>{
+    const highlighted = key===metricKey;
+    return `<span${highlighted?' class="dd-stat-highlight"':''}><b>${fmt(post[key])}</b> ${esc(label)}</span>`;
+  }).join("");
+}
+// Round 128: media/content type badge colors must be BOTH stable (a given type value
+// always gets the same highlight) AND collision-free from each other (e.g. "photo" and
+// "post" must never land on the same color) -- a per-label hash could coincidentally
+// collide (confirmed: "photo" and "post" hashed to the same palette slot), so instead this
+// computes one combined map, ONCE per drilldown-panel render, from every distinct
+// media_type/content_type value found across the FULL active view (not just whichever
+// day's posts happen to be on screen) -- same approach entityColorMap() already uses
+// elsewhere for brand/platform colors: dedupe, sort, assign sequential distinct palette
+// slots. Sorted + full-view-derived means a type's color stays identical no matter which
+// day bucket is selected, and any two different values only collide once the dataset has
+// more than CHART_PALETTE.length distinct type values combined (realistic real-world
+// exports carry far fewer than that).
+function computeTypeBadgeColorMap(rows){
+  const seen = new Set();
+  (rows||[]).forEach(r=>{
+    const mt = String(r.media_type||"").trim().toLowerCase();
+    const ct = String(r.content_type||"").trim().toLowerCase();
+    if(mt) seen.add(mt);
+    if(ct) seen.add(ct);
+  });
+  const sorted = [...seen].sort();
+  const map = {};
+  sorted.forEach((key,i)=>{ map[key] = CHART_PALETTE[i % CHART_PALETTE.length]; });
+  return map;
+}
+// Media type + content type shown as small colored badges (e.g. "Photo", "Post"), colored
+// via the shared colorMap computed by computeTypeBadgeColorMap() -- rendered separately
+// from kpiDrilldownPostMetricsHTML() so the two groups can be laid out on opposite sides
+// of the same stats row (metrics left, badges right). Falls back to a neutral gray if a
+// type value somehow isn't in the map (shouldn't happen -- the map is built from the same
+// rows these posts came from -- but keeps the badge from rendering with an "undefined" color).
+function kpiDrilldownPostTypeBadgesHTML(post, colorMap){
+  colorMap = colorMap || {};
+  const badges = [];
+  if(post.media_type){
+    const key = String(post.media_type).trim().toLowerCase();
+    const c = colorMap[key] || "#9ca3af";
+    badges.push(`<span class="dd-type-badge" style="background:${c}26;color:${c}">${esc(cap(post.media_type))}</span>`);
+  }
+  if(post.content_type){
+    const key = String(post.content_type).trim().toLowerCase();
+    const c = colorMap[key] || "#9ca3af";
+    badges.push(`<span class="dd-type-badge" style="background:${c}26;color:${c}">${esc(cap(post.content_type))}</span>`);
+  }
+  return badges.join("");
+}
+function openKpiDrilldown(metricKey){
+  if(!STATE.performance) return;
+  if(KPI_DRILLDOWN_METRIC_KEYS.indexOf(metricKey)===-1) return;
+  // Same shared panel as "Compare brands/platforms" -- clear any stale B/P compare context
+  // so "Export to Excel" (which reads STATE.compareContext, see exportCompareWidget()) can
+  // never act on leftover state from a previous compare session while this content shows;
+  // the export button itself is hidden below for the same reason (this content has no
+  // export of its own yet).
+  STATE.compareContext = null;
+  STATE.kpiDrilldownContext = { metricKey };
+  STATE.kpiDrilldownGranularity = STATE.kpiDrilldownGranularity || "daily";
+  STATE.kpiDrilldownSelectedBucket = null;
+  renderKpiDrilldownBody();
+  const exportBtn = $("widgetCompareExport");
+  if(exportBtn) exportBtn.style.display = "none";
+  $("widgetCompareOverlay").classList.add("show");
+  $("main").classList.add("blurred-behind");
+}
+function renderKpiDrilldownBody(){
+  const context = STATE.kpiDrilldownContext;
+  if(!context) return;
+  const metricKey = context.metricKey;
+  const base = getActivePerformanceView();
+  if(!base) return;
+  const granularity = STATE.kpiDrilldownGranularity || "daily";
+  const title = metricLabel(metricKey);
+  const hasRange = !!(base.date_from && base.date_to);
+  const { buckets, values } = hasRange
+    ? computeKpiDrilldownSeries(base.rowsData||[], metricKey, base.date_from, base.date_to, granularity)
+    : { buckets:[], values:[] };
+  const selectedBucket = STATE.kpiDrilldownSelectedBucket;
+
+  let postsHtml = `<p style="color:var(--text-muted);font-size:12.5px;margin-top:14px">Click a point on the chart to see that period's posts.</p>`;
+  if(selectedBucket){
+    const { from, to } = bucketRangeFor(selectedBucket, granularity);
+    const rangeLabel = from===to ? formatDatePretty(from) : `${formatDatePretty(from)} → ${formatDatePretty(to)}`;
+    const rows = (base.rowsData||[]).filter(r=>{ const d = dayOf(r.date); return d!=="unknown" && d>=from && d<=to; });
+    const posts = computeKpiDrilldownPosts(rows, metricKey);
+    const sortLabel = metricLabel(kpiDrilldownSortKeyFor(metricKey));
+    // Colors are derived from the WHOLE raw report (STATE.performance.rowsData -- the same
+    // "read from the unfiltered base, not the currently-filtered view" precedent used
+    // elsewhere, e.g. buildDayInsight()/dayInsightScopeLabel()), not from base.rowsData
+    // (which is the Global-Filter-narrowed *active view*) and not from just this selected
+    // day's posts -- so a type's badge color stays identical no matter which day bucket is
+    // selected AND no matter how the brand/platform/content/media Global Filter is set.
+    const typeColorMap = computeTypeBadgeColorMap((STATE.performance && STATE.performance.rowsData) || []);
+    postsHtml = `
+      <h3 style="margin:18px 0 2px;font-size:14.5px">${esc(rangeLabel)}</h3>
+      <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px">${fmt(posts.length)} post${posts.length===1?"":"s"}, sorted by ${esc(sortLabel)}.</p>
+      ${posts.map(p=>`
+        <div class="dd-post-card">
+          <div class="dd-post-text" dir="auto">${p.permalink?`<a href="${esc(p.permalink)}" target="_blank" rel="noopener">${esc(String(p.caption||"(no caption)").slice(0,220))}</a>`:esc(String(p.caption||"(no caption)").slice(0,220))}</div>
+          <div class="dd-post-meta"><span dir="auto">${esc(p.profile)}</span> · ${platformIconHTML(p.platform)} ${esc(p.platform)} · ${formatDatePretty(p.date)}</div>
+          <div class="dd-post-stats dd-post-stats-split">
+            <div class="dd-post-stats-metrics">${kpiDrilldownPostMetricsHTML(p, metricKey)}</div>
+            <div class="dd-post-type-badges">${kpiDrilldownPostTypeBadgesHTML(p, typeColorMap)}</div>
+          </div>
+        </div>`).join("") || `<p style="color:var(--text-muted);font-size:12.5px">No posts on this date.</p>`}
+    `;
+  }
+
+  $("widgetCompareBody").innerHTML = `
+    <h2 style="margin:0 0 4px;font-size:17px">${esc(title)}</h2>
+    <p style="color:var(--text-muted);font-size:12px;margin:0 0 14px">${hasRange?`${formatDatePretty(base.date_from)} → ${formatDatePretty(base.date_to)}`:""}</p>
+    ${hasRange ? `<div class="card">
+      <div class="pill-toggle" id="kpiDrilldownGranToggle" style="margin-bottom:12px">
+        <button data-g="daily" class="${granularity==='daily'?'active':''}">Daily</button>
+        <button data-g="weekly" class="${granularity==='weekly'?'active':''}">Weekly</button>
+        <button data-g="monthly" class="${granularity==='monthly'?'active':''}">Monthly</button>
+      </div>
+      <div class="chart-wrap"><canvas id="kpiDrilldownChart"></canvas></div>
+    </div>` : `<p style="color:var(--text-muted);font-size:12.5px">No dated posts available for this metric.</p>`}
+    ${postsHtml}
+  `;
+
+  if(hasRange){
+    destroyChart("kpiDrilldown");
+    const ctx = $("kpiDrilldownChart").getContext("2d");
+    const lineColor = BIGD_METRIC_COLOR[metricKey] || STATE.client.accent;
+    charts.kpiDrilldown = new Chart(ctx, {
+      type:"line",
+      data:{ labels: buckets.map(bigdDashDate), datasets:[{
+        label:title, data:values, borderColor:lineColor, backgroundColor:lineColor,
+        fill:false, tension:.3, borderWidth:1.75, pointRadius:3, pointHoverRadius:5,
+        pointBackgroundColor:lineColor
+      }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+        onClick:(evt,elements)=>{
+          if(!elements.length) return;
+          const idx = elements[0].index;
+          STATE.kpiDrilldownSelectedBucket = buckets[idx];
+          renderKpiDrilldownBody();
+        },
+        plugins:{
+          legend:{display:false},
+          tooltip:{ callbacks:{ label:(tctx)=> `${title}: ${fmt(tctx.parsed.y)}` } }
+        },
+        scales:{
+          x:{ticks:{maxRotation:0,autoSkip:true}},
+          y:{beginAtZero:true, ticks:{callback:v=>fmt(v)}}
+        }
+      }
+    });
+    const granToggleEl = $("kpiDrilldownGranToggle");
+    if(granToggleEl) granToggleEl.addEventListener("click", (e)=>{
+      const btn = e.target.closest("button"); if(!btn) return;
+      STATE.kpiDrilldownGranularity = btn.dataset.g;
+      // A daily bucket key like "2026-01-05" isn't a valid weekly/monthly bucket key --
+      // reset the selected period rather than feeding a stale key into bucketRangeFor().
+      STATE.kpiDrilldownSelectedBucket = null;
+      renderKpiDrilldownBody();
+    });
+  }
+}
+
 function openWidgetCompare(dimension, kind, title, opts){
   // Round 115: scoped to the active global brand/platform filter (getActivePerformanceView()),
   // not the raw export -- so a "Compare brands" click while the global filter is narrowed to
@@ -7714,6 +8062,12 @@ function openWidgetCompare(dimension, kind, title, opts){
   if(!base) return;
   const entities = dimension==="brand" ? (base.profiles||[]) : (base.platforms||[]);
   if(entities.length<2) return;
+  // Round 125: this shared panel may currently be showing the KPI-value timeline/drilldown
+  // instead -- clear that context and restore the Export button (hidden while that content
+  // was showing, see openKpiDrilldown()) so the normal Compare flow is completely unaffected.
+  STATE.kpiDrilldownContext = null;
+  const exportBtn = $("widgetCompareExport");
+  if(exportBtn) exportBtn.style.display = "";
   STATE.compareContext = { dimension, kind, title, opts };
   STATE.compareFilter = { brand:"all", platform:"all" };
   renderWidgetCompareBody();
@@ -15755,6 +16109,232 @@ function downloadStandaloneHTML(){
 }
 
 /* ============================================================
+   SAVED VIEWS (server-backed, per signed-in user)
+   ------------------------------------------------------------
+   Lets a signed-in user save their current dashboard -- filters, active
+   tab/section, AND the loaded dataset, via the exact same JSON.stringify(STATE)
+   shape downloadStandaloneHTML() above already produces -- to a small API
+   (/api/views, see the Railway server's server.js) and restore it later from
+   any device with zero re-uploading.
+
+   This whole feature is optional infrastructure: BIGD_0.2.html is also used
+   as a standalone file with no server behind it (downloadStandaloneHTML()'s
+   own output, or a plain static host) -- checkSavedViewsAvailable() probes
+   /api/me once and every save/restore control stays hidden if that backend
+   isn't there, so nothing here ever breaks the no-backend case.
+   ============================================================ */
+let SAVED_VIEWS_AVAILABLE = null; // null = not checked yet, true/false once known
+let SAVED_VIEWS_CACHE = null;     // [{id,name,updated_at}], once fetched -- never holds full state (that's fetched per-view, on demand, in fetchSavedViewFull())
+
+// Test-only: SAVED_VIEWS_AVAILABLE/SAVED_VIEWS_CACHE are reassigned wholesale (not mutated
+// in place), so a test can't just read/write them through the usual hooks object (which only
+// captures a frozen snapshot of a plain `let` at hook-build time -- see build_hooks.py's
+// special-casing of WZ/STATE for the same reason). These two functions are the live,
+// always-current way in and out. Never called from real app code.
+function __setSavedViewsStateForTests(available, cache){
+  SAVED_VIEWS_AVAILABLE = available;
+  SAVED_VIEWS_CACHE = cache;
+}
+function __getSavedViewsStateForTests(){
+  return { available: SAVED_VIEWS_AVAILABLE, cache: SAVED_VIEWS_CACHE };
+}
+
+async function checkSavedViewsAvailable(){
+  if(SAVED_VIEWS_AVAILABLE!==null) return SAVED_VIEWS_AVAILABLE;
+  try{
+    const res = await fetch("/api/me", {credentials:"same-origin"});
+    SAVED_VIEWS_AVAILABLE = !!(res && res.ok);
+  }catch(e){
+    SAVED_VIEWS_AVAILABLE = false;
+  }
+  return SAVED_VIEWS_AVAILABLE;
+}
+
+async function refreshSavedViewsCache(){
+  const available = await checkSavedViewsAvailable();
+  if(!available){ SAVED_VIEWS_CACHE = null; return SAVED_VIEWS_CACHE; }
+  try{
+    const res = await fetch("/api/views", {credentials:"same-origin"});
+    const data = await res.json().catch(()=>({}));
+    SAVED_VIEWS_CACHE = res.ok ? (data.views||[]) : null;
+  }catch(e){
+    SAVED_VIEWS_CACHE = null;
+  }
+  // If the wizard's very first (branch-choice) screen is what's currently showing, re-render
+  // it so a freshly-loaded "My saved views" entry appears without the user having to do
+  // anything -- the very first paint of that screen can't wait on this network round trip.
+  if($("wizardOverlay") && $("wizardOverlay").classList.contains("show") && WZ.step===0 && !WZ.branch){
+    renderWizard();
+  }
+  return SAVED_VIEWS_CACHE;
+}
+
+async function saveCurrentViewToServer(name){
+  const state = JSON.parse(JSON.stringify(STATE));
+  const res = await fetch("/api/views", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({name, state})
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || "Couldn't save this view.");
+  return data.view;
+}
+
+async function fetchSavedViewFull(id){
+  const res = await fetch("/api/views/"+encodeURIComponent(id), {credentials:"same-origin"});
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || "Couldn't load this view.");
+  return data.view;
+}
+
+async function deleteSavedViewFromServer(id){
+  const res = await fetch("/api/views/"+encodeURIComponent(id), {method:"DELETE", credentials:"same-origin"});
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || "Couldn't delete this view.");
+  return true;
+}
+
+// Applies a full saved dashboard snapshot -- the same "wizard finished, hand off to the
+// dashboard" sequence every finalize*Build() function already performs (see
+// finalizePerformanceBuild()), just fed from a restored STATE instead of a freshly-built one.
+function applyRestoredViewState(savedState){
+  // Object.assign(STATE, savedState) -- NOT Object.assign({}, STATE, savedState) -- mutates
+  // the EXISTING STATE object in place and returns that same reference (this is the same
+  // pattern bootstrap()'s own dead "resume a saved build" code already uses at
+  // `STATE = Object.assign(STATE, saved)`); using {} as the target would instead point STATE
+  // at a brand new object, which every other part of the app (and this file's own test hooks)
+  // would have no way to observe.
+  STATE = Object.assign(STATE, savedState);
+  clearWizardDraft();
+  if($("wizardOverlay")) $("wizardOverlay").classList.remove("show");
+  if($("navList")) $("navList").classList.remove("locked");
+  ["resetFiltersBtn","downloadBtn"].forEach(id=>{ const el=$(id); if(el){ el.disabled=false; el.classList.remove("disabled"); } });
+  applyAccent();
+  applyMode(STATE.mode || "performance");
+  if(STATE.mode!=="quickPerf" && STATE.activeView){
+    navigateToView(STATE.activeView);
+    qsa(".navitem").forEach(b=> b.classList.toggle("active", b.dataset.view===STATE.activeView));
+  }
+  refreshSidebarLockState();
+  toast("Saved view restored.");
+}
+
+function ensureSavedViewsOverlayDOM(){
+  if($("savedViewsOverlay")) return;
+  document.body.insertAdjacentHTML("beforeend", `
+    <div id="savedViewsOverlay" class="export-options-overlay">
+      <div class="export-options-backdrop" id="savedViewsBackdrop"></div>
+      <div class="export-options-modal" id="savedViewsModal">
+        <button class="close-x" id="savedViewsClose">&times;</button>
+        <div id="savedViewsBody"></div>
+      </div>
+    </div>
+  `);
+  $("savedViewsBackdrop").addEventListener("click", closeSavedViewsModal);
+  $("savedViewsClose").addEventListener("click", closeSavedViewsModal);
+}
+
+function ensureSavedViewsFabDOM(){
+  if($("savedViewsFab")) return;
+  const adminFab = $("adminFab");
+  if(!adminFab) return;
+  adminFab.insertAdjacentHTML("beforebegin", `<button id="savedViewsFab" title="My saved views" style="display:none">&#128190;</button>`);
+  $("savedViewsFab").addEventListener("click", openSavedViewsModal);
+}
+
+function closeSavedViewsModal(){
+  const ov = $("savedViewsOverlay");
+  if(ov) ov.classList.remove("show");
+}
+
+function savedViewsListItemHTML(v){
+  return `<div class="saved-view-row" data-id="${esc(v.id)}">
+    <button type="button" class="saved-view-restore" data-id="${esc(v.id)}">
+      <b dir="auto">${esc(v.name)}</b><span>Updated ${esc(formatDatePretty(dayOf(v.updated_at)))}</span>
+    </button>
+    <button type="button" class="saved-view-delete" data-id="${esc(v.id)}" title="Delete this saved view">&times;</button>
+  </div>`;
+}
+
+function renderSavedViewsModalBody(loading){
+  const hasCurrent = !!(STATE.listening || STATE.performance || STATE.quickPerf);
+  const list = SAVED_VIEWS_CACHE;
+  const listHtml = loading
+    ? `<p class="sub">Loading your saved views…</p>`
+    : (!list ? `<p class="sub">Couldn't load your saved views. Check your connection and try again.</p>`
+      : (list.length===0 ? `<p class="sub">You haven't saved any views yet.</p>`
+        : list.map(savedViewsListItemHTML).join("")));
+  $("savedViewsBody").innerHTML = `
+    <h2 style="margin:0 0 4px;font-size:17px">My saved views</h2>
+    <p class="modalsub">Save your current filters and data, or jump back into a view you saved earlier.</p>
+    ${hasCurrent ? `
+      <div class="formgroup">
+        <label>Save the current view</label>
+        <input type="text" id="savedViewNameInput" placeholder="e.g. Weekly report" maxlength="120">
+        <button type="button" class="btn primary" id="savedViewSaveBtn" style="margin-top:8px">Save current view</button>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--card-border);margin:18px 0">
+    ` : ""}
+    <div id="savedViewsList">${listHtml}</div>
+  `;
+  const saveBtn = $("savedViewSaveBtn");
+  if(saveBtn) saveBtn.addEventListener("click", async ()=>{
+    const input = $("savedViewNameInput");
+    const name = (input && input.value || "").trim();
+    if(!name){ toast("Give this view a name first."); return; }
+    saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+    try{
+      await saveCurrentViewToServer(name);
+      toast("View saved.");
+      await refreshSavedViewsCache();
+      renderSavedViewsModalBody(false);
+    }catch(e){
+      toast(e.message || "Couldn't save this view.");
+      saveBtn.disabled = false; saveBtn.textContent = "Save current view";
+    }
+  });
+  qsa(".saved-view-restore", $("savedViewsBody")).forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.dataset.id;
+      btn.disabled = true;
+      try{
+        const view = await fetchSavedViewFull(id);
+        closeSavedViewsModal();
+        applyRestoredViewState(view.state);
+      }catch(e){
+        toast(e.message || "Couldn't load this view.");
+        btn.disabled = false;
+      }
+    });
+  });
+  qsa(".saved-view-delete", $("savedViewsBody")).forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.dataset.id;
+      btn.disabled = true;
+      try{
+        await deleteSavedViewFromServer(id);
+        await refreshSavedViewsCache();
+        renderSavedViewsModalBody(false);
+      }catch(err){
+        toast(err.message || "Couldn't delete this view.");
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+async function openSavedViewsModal(){
+  ensureSavedViewsOverlayDOM();
+  $("savedViewsOverlay").classList.add("show");
+  renderSavedViewsModalBody(true);
+  await refreshSavedViewsCache();
+  renderSavedViewsModalBody(false);
+}
+
+
+/* ============================================================
    SETUP WIZARD
    ============================================================ */
 const PLATFORMS = [
@@ -15967,8 +16547,17 @@ function renderSwatchPicker(container, swatches, current, onPick){
 
 /* ---- step renderers ---- */
 function stepHTML_type(){
+  // Round 129: "My saved views" -- only shown once we know a backend is actually there
+  // (SAVED_VIEWS_AVAILABLE) AND that user actually has at least one saved view; a fresh
+  // page load hasn't resolved that async check yet on the very first paint, so this
+  // legitimately renders nothing for a moment, then reappears via refreshSavedViewsCache()'s
+  // own re-render once the list arrives.
+  const savedViewsBlock = (SAVED_VIEWS_AVAILABLE && SAVED_VIEWS_CACHE && SAVED_VIEWS_CACHE.length>0)
+    ? `<button type="button" class="wiz-saved-views-link" id="wizSavedViewsLink">My saved views (${SAVED_VIEWS_CACHE.length}) &rarr;</button>`
+    : "";
   return `<h2>What do you want to build?</h2>
   <p class="wiz-sub">Choose the dashboard branch.</p>
+  ${savedViewsBlock}
   <div class="wiz-choice-row">
     <button class="wiz-card wiz-card-disabled ${WZ.branch==='listening'?'selected':''}" data-branch="listening" aria-disabled="true" title="Listening Branch is under development"><b>Listening</b><span>What is the public saying about us? <i>(Under development)</i></span></button>
     <button class="wiz-card ${WZ.branch==='performance'?'selected':''}" data-branch="performance"><b>Performance</b><span>How did our own content perform?</span></button>
@@ -16874,6 +17463,8 @@ function bindWizardStepEvents(stepId){
       }
       WZ.branch = c.dataset.branch; WZ.perfMode = null; WZ.step=0; renderWizard();
     }));
+    const savedViewsLink = $("wizSavedViewsLink");
+    if(savedViewsLink) savedViewsLink.addEventListener("click", openSavedViewsModal);
   }
   else if(stepId==="perfMode"){
     qsa(".wiz-card[data-perfmode]").forEach(c=>c.addEventListener("click", ()=>{ WZ.perfMode = c.dataset.perfmode; renderWizard(); }));
@@ -17376,6 +17967,13 @@ function wizardBack(){
    ============================================================ */
 function bootstrap(){
   initTheme();
+  ensureSavedViewsFabDOM();
+  checkSavedViewsAvailable().then(available=>{
+    if(available){
+      if($("savedViewsFab")) $("savedViewsFab").style.display = "flex";
+      refreshSavedViewsCache();
+    }
+  });
   const saved = loadState();
   if(saved && (saved.listening || saved.performance)){
     STATE = Object.assign(STATE, saved);
@@ -17707,6 +18305,16 @@ function bootstrap(){
       metricKey: btn.dataset.metric,
       granularity: STATE.perfFreqGranularity
     });
+  });
+  // Round 125: clicking directly on a main-dashboard KPI card's own value (not its B/P mini
+  // buttons) opens the same shared panel via openKpiDrilldown() -- see that function's own
+  // comment for exactly which KPI keys this applies to.
+  document.addEventListener("click", (e)=>{
+    const valueEl = e.target.closest("[data-kpi-key] .value");
+    if(!valueEl) return;
+    const card = valueEl.closest("[data-kpi-key]");
+    if(!card) return;
+    openKpiDrilldown(card.dataset.kpiKey);
   });
   document.addEventListener("click", (e)=>{
     const btn = e.target.closest(".export-btn");

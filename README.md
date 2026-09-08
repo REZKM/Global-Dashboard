@@ -90,3 +90,26 @@ Railway handles the SSL certificate either way.
 - This was tested locally end-to-end (allowlist rejection, first-time
   password creation, returning-user login, wrong-password rejection, and
   unauthenticated access all behave correctly) before being handed to you.
+
+## Saved views
+
+Signed-in users can save their current dashboard (filters, active tab, and
+the loaded dataset) and restore it later from any device, with no
+re-uploading. This is a small JSON API the dashboard's own JS calls — there's
+nothing extra to configure, it uses the same Postgres database as logins.
+
+- `GET /api/me` — who's currently signed in.
+- `GET /api/views` — list the signed-in user's saved views (name + last
+  updated only, not the full data — keeps the list fast).
+- `POST /api/views` — save a new view (`{ name, state }` body).
+- `GET /api/views/:id` — fetch one saved view's full state, to restore it.
+- `PUT /api/views/:id` — overwrite an existing saved view.
+- `DELETE /api/views/:id` — delete one.
+
+All five are scoped to the caller's own session — a user can never read,
+overwrite, or delete another user's saved view, even by guessing an id.
+Each user can save up to 20 views (`MAX_VIEWS_PER_USER` in `db.js`) since a
+view's dataset can run a few MB each; a request over 25MB is rejected with a
+clear error rather than crashing the server (raise the limit in `server.js`
+if your exports are unusually large). Adds one table, `saved_views`, created
+automatically alongside `users` the first time the server starts.
