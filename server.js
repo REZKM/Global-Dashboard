@@ -1,9 +1,11 @@
 require('dotenv').config();
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
 const db = require('./db');
+const { loadDesignHead, injectDesign } = require('./design');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,7 +62,6 @@ app.use(
 );
 
 function requireAuth(req, res, next) {
-  console.log(`[requireAuth] path=${req.path} hasSession=${!!req.session} userEmail=${req.session && req.session.userEmail}`);
   if (req.session && req.session.userEmail) return next();
   return res.redirect('/login');
 }
@@ -70,13 +71,28 @@ function requireApiAuth(req, res, next) {
   return res.status(401).json({ error: 'Not logged in.' });
 }
 
+// Colours and fonts for every page come from DESIGN.md. In production it is read once at
+// startup (redeploy to apply a change); locally it is re-read on each request.
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+let designHeadCache = null;
+function designHead() {
+  if (!IS_PRODUCTION || !designHeadCache) designHeadCache = loadDesignHead();
+  return designHeadCache;
+}
+
+const escapeHtml = (value) => String(value)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// Login pages. `error` is trusted HTML written in this file; every other value is escaped.
+const AUTH_STYLES = fs.readFileSync(path.join(__dirname, 'views', 'auth.css'), 'utf8');
 function render(res, view, replacements = {}) {
-  const fs = require('fs');
   let html = fs.readFileSync(path.join(__dirname, 'views', view), 'utf8');
+  html = html.split('{{authStyles}}').join(AUTH_STYLES);
   for (const [key, value] of Object.entries(replacements)) {
-    html = html.split(`{{${key}}}`).join(value);
+    html = html.split(`{{${key}}}`).join(key === 'error' ? value : escapeHtml(value));
   }
-  res.send(html);
+  res.send(injectDesign(html, designHead()));
 }
 
 // Express 4 does not catch errors thrown inside an async route handler —
@@ -96,7 +112,6 @@ app.get('/login', (req, res) => {
 app.post('/check-email', asyncHandler(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const isAllowed = !!email && getAllowedEmails().includes(email);
-  console.log(`[check-email] email=${email} isAllowed=${isAllowed} allowedList=${JSON.stringify(getAllowedEmails())}`);
 
   if (!isAllowed) {
     return render(res, 'login-email.html', {
@@ -105,7 +120,6 @@ app.post('/check-email', asyncHandler(async (req, res) => {
   }
 
   const existing = await db.findUser(email);
-  console.log(`[check-email] existing account found=${!!existing}`);
   if (existing) {
     return render(res, 'enter-password.html', { email, error: '' });
   }
@@ -143,7 +157,6 @@ app.post('/set-password', asyncHandler(async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   await db.createUser(email, passwordHash);
-  console.log(`[set-password] created account for ${email}, setting session and redirecting to /dashboard`);
 
   req.session.userEmail = email;
   res.redirect('/dashboard');
@@ -155,13 +168,11 @@ app.post('/enter-password', asyncHandler(async (req, res) => {
   const { password } = req.body;
 
   const user = await db.findUser(email);
-  console.log(`[enter-password] email=${email} accountFound=${!!user}`);
   if (!user) {
     return render(res, 'login-email.html', { error: '' });
   }
 
   const ok = await bcrypt.compare(password || '', user.password_hash);
-  console.log(`[enter-password] passwordMatch=${ok}`);
   if (!ok) {
     return render(res, 'enter-password.html', {
       email,
@@ -170,7 +181,6 @@ app.post('/enter-password', asyncHandler(async (req, res) => {
   }
 
   req.session.userEmail = email;
-  console.log(`[enter-password] login success for ${email}, redirecting to /dashboard`);
   res.redirect('/dashboard');
 }));
 
@@ -254,19 +264,32 @@ app.get('/logout', (req, res) => {
 });
 
 // ---- Protected dashboard ----
-// Drop your existing dashboard's HTML/CSS/JS files into public/dashboard/.
-// The entry file defaults to "index.html", but if your dashboard file keeps
-// a different name (e.g. GDC_Dashboard_latest.html), set the
-// DASHBOARD_INDEX_FILE env var to that exact filename instead of renaming
-// it every time you update it.
-const DASHBOARD_INDEX_FILE = process.env.DASHBOARD_INDEX_FILE || 'index.html';
-app.use(
-  '/dashboard',
-  requireAuth,
-  express.static(path.join(__dirname, 'public', 'dashboard'), { index: DASHBOARD_INDEX_FILE })
-);
-app.get('/dashboard', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard', DASHBOARD_INDEX_FILE));
+// The dashboard is one self-contained page: public/dashboard/index.html. It is served with
+// the DESIGN.md tokens injected into its <head>. DASHBOARD_INDEX_FILE can point at a
+// different file name in that folder; if that file doesn't exist, index.html is used.
+const DASHBOARD_DIR = path.join(__dirname, 'public', 'dashboard');
+function dashboardFile() {
+  const configured = process.env.DASHBOARD_INDEX_FILE;
+  if (configured && configured !== path.basename(configured)) {
+    console.warn(`DASHBOARD_INDEX_FILE must be a file name, not a path; using index.html.`);
+  } else if (configured && fs.existsSync(path.join(DASHBOARD_DIR, configured))) {
+    return configured;
+  } else if (configured) {
+    console.warn(`DASHBOARD_INDEX_FILE "${configured}" not found in public/dashboard; using index.html.`);
+  }
+  return 'index.html';
+}
+let dashboardCache = null;
+function dashboardHtml() {
+  if (!IS_PRODUCTION || !dashboardCache) {
+    const page = fs.readFileSync(path.join(DASHBOARD_DIR, dashboardFile()), 'utf8');
+    dashboardCache = injectDesign(page, designHead());
+  }
+  return dashboardCache;
+}
+app.get(['/dashboard', '/dashboard/', '/dashboard/index.html'], requireAuth, (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.type('html').send(dashboardHtml());
 });
 
 app.get('/', (req, res) => {

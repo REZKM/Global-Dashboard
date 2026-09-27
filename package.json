@@ -1,10 +1,11 @@
 {
   "name": "dashboard-auth",
   "version": "1.0.0",
-  "description": "Static HTML dashboard served behind an email-allowlist login where each user sets their own password on first visit. Ready to deploy on Railway.",
+  "description": "Performance dashboard for Emplifi exports, served behind an email-allowlist login where each user sets their own password on first visit. Ready to deploy on Railway.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node scripts/check.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
