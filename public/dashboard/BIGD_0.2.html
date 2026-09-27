@@ -2971,7 +2971,9 @@ function fmtSpanFull(n){ return `<span class="count-up" title="${exactNum(n)}" d
 // fmt()'s K/M abbreviation and whole-number rounding would mangle a value like 2.34 into
 // "2", losing the decimal precision that actually matters for a rate this small. Mirrors
 // fmtSpanFull()'s own "data-full" precedent with a new "data-pct" flag instead.
-function exactPct(n){ return (Math.round((Number(n)||0)*10)/10) + "%"; }
+// Engagement-rate display rule: under 10% -> two decimals (0.95%, 0.04%); 10% and above -> one decimal.
+function fmtRatePct(n){ const v = Number(n)||0; return (Math.abs(Math.round(v*100)/100) < 10 ? v.toFixed(2) : v.toFixed(1)) + "%"; }
+function exactPct(n){ return fmtRatePct(n); }
 function fmtSpanPct(n){ return `<span class="count-up" title="${exactPct(n)}" data-target="${Number(n)||0}" data-pct="1">0</span>`; }
 function pct(n,d){ if(!d) return "0%"; return Math.round((n/d)*1000)/10 + "%"; }
 
@@ -3239,9 +3241,15 @@ function dayOf(dateVal){
   const s = String(dateVal||"");
   const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
   if(m) return m[1];
-  const d = new Date(dateVal);
-  if(!isNaN(d)) return d.toISOString().slice(0,10);
+  const d = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
+  if(!isNaN(d)) return localDayKey(d);
   return "unknown";
+}
+// A post's calendar day from LOCAL date parts. toISOString() converts to UTC first, which
+// moves a date-only value like "2/5/26" (parsed as local midnight) one day earlier for
+// anyone east of UTC (Egypt, Gulf).
+function localDayKey(d){
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 }
 
 function buildListeningDataset(rawRows, headerMap, meta){
@@ -3459,16 +3467,10 @@ function interactionsValueOf(r){
 // one of its rows is not trusted as if it were real.
 function engagementsValueOf(r){
   if(accountTypeOf(r)!=="owned") return 0;
-  // Every platform's own "Engagements" column omits Shares — the same documented pattern
-  // already applied to Instagram/YouTube's Total Interactions — so the real total needs
-  // Shares added back explicitly. Applied uniformly across every platform AND every
-  // content type, including Stories, per explicit direction.
-  // NOTE: checking a real Emplifi export earlier showed Instagram Stories' declared
-  // Engagements column never actually moving when Shares did (Comments matched it
-  // exactly on all 14 sample rows) — that empirical finding is superseded here by this
-  // direction to apply the same +Shares rule everywhere for consistency across the whole
-  // dashboard. Worth re-checking against a fuller export if the numbers look off for Stories.
-  return (Number(r.engagements)||0) + (Number(r.shares)||0);
+  // Emplifi's "Engagements" column already includes Shares (verified on a real export:
+  // TikTok Engagements = Likes + Comments + Shares on 18/18 rows; Instagram 233 likes + 1
+  // comment + 2 shares + saves -> 242). Read it as-is -- adding Shares again double-counted them.
+  return Number(r.engagements)||0;
 }
 function engagementMetricLabel(){ return engagementMetricMode()==="engagements" ? "Engagements" : "Total Interactions"; }
 function engagementMetricColumnLabel(){ return engagementMetricMode()==="engagements" ? "the Engagements column" : "the Total Interactions column"; }
@@ -3531,8 +3533,8 @@ function interactionsComponentsFor(row){
 function engagementsComponentsFor(row){
   if(accountTypeOf(row)!=="owned") return []; // Engagements isn't available for public accounts
   // Stories fall through to the same per-platform list as every other content type —
-  // every platform's list below already includes Shares, matching engagementsValueOf's
-  // +Shares total, and a Story row's other fields (Likes/Saves etc.) simply read as 0
+  // every platform's list below includes Shares, which Emplifi's Engagements column
+  // already contains (see engagementsValueOf), and a Story row's other fields (Likes/Saves etc.) simply read as 0
   // since Emplifi doesn't populate them for that content type.
   const p = platformKeyOf(row.platform);
   if(p==="instagram") return [["Likes",Number(row.likes)||0],["Comments",Number(row.comments)||0],["Shares",Number(row.shares)||0],["Saves",Number(row.saves)||0]];
@@ -3607,7 +3609,7 @@ function bindContentScopeToggles(container, rerenderFn){
   });
 }
 
-function freshPerfAgg(){ return {posts:0, reach:0, impressions:0, likes:0, comments:0, shares:0, saves:0, post_clicks:0, engagement:0, video_views:0}; }
+function freshPerfAgg(){ return {posts:0, reach:0, impressions:0, likes:0, comments:0, shares:0, saves:0, post_clicks:0, engagement:0, video_views:0, rate_erf_eng:0, rate_erf_followers:0, rate_er_eng:0, rate_er_reach:0, rate_eri_eng:0, rate_eri_impressions:0}; }
 function addPerfRowTo(agg, r){
   agg.posts++;
   agg.reach += Number(r.reach)||0;
@@ -3619,6 +3621,7 @@ function addPerfRowTo(agg, r){
   agg.post_clicks += Number(r.post_clicks)||0;
   agg.video_views += Number(r.video_views)||0;
   agg.engagement += engagementValueOf(r);
+  addEngagementRateRow(agg, r, engagementValueOf);
 }
 
 function aggregatePerformanceRows(rows){
@@ -6022,10 +6025,8 @@ function renderPerfOverview(){
            KPI card with a 3-way ERF/ER%/ERi pill toggle beside its title (default ERF, per
            explicit request) -- the toggle switches STATE.overviewErMetric and re-renders
            this same card in place rather than showing 3 near-duplicate cards side by side.
-           Followers Number (ERF's denominator) is resolved via followersNumberFor(P), which
-           now sums every profile x platform combination in P's own already-globally-filtered
-           row set -- correct for all four report types, and automatically narrower once the
-           global Brand/Platform filter narrows P itself (see benchmarkFollowersTotal()). -->
+           All three rates come from engagementRatesFor(P.rowsData): ERF divides by each
+           post's own profile followers; ER/ERi count only posts that report reach/impressions. -->
       ${erKpiTileHTML(P, t, kpiTile)}
     </div>
     ${renderOverviewBreakdownHTML(P, t)}`;
@@ -7670,7 +7671,7 @@ function paintMiniKpi(containerId, rows, metricKey, breakdownField){
   // silently show 0 for every entity here).
   const isErMetric = metricKey==="engagement_rate";
   let val;
-  if(isErMetric) val = erMetricCurrentValue(t.engagement, t.reach, t.impressions, benchmarkFollowersTotal(null, agg));
+  if(isErMetric) val = erMetricCurrentValue(rows);
   else if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
   else val = t[metricKey]||0;
 
@@ -7679,22 +7680,14 @@ function paintMiniKpi(containerId, rows, metricKey, breakdownField){
     const list = breakdownField==="platform" ? (agg.byPlatform||[]) : (agg.byProfile||[]);
     const labelKey = breakdownField==="platform" ? "platform" : "profile";
     if(list.length>1){
-      // For the ERF%-flavored reading specifically, each breakdown row's own followers
-      // denominator must be scoped to just that row's platform (when breaking down by
-      // platform, within a rows set already scoped to one brand) or just that row's
-      // profile (when breaking down by profile, within a rows set already scoped to one
-      // platform) -- never the whole tile's combined followers figure.
-      const followersCombos = Object.values(agg.followersByProfilePlatform||{});
+      // Each breakdown entry is rated from its own posts only (engagementRatesFor on the
+      // entry's aggregate), so every post is measured against its own profile's followers.
       const metricOf = (x)=>{
         if(metricKey==="avg_engagement") return x.posts?x.engagement/x.posts:0;
-        if(isErMetric){
-          const matching = breakdownField==="platform" ? followersCombos.filter(c=>c.platform===x.platform) : followersCombos.filter(c=>c.profile===x.profile);
-          const followersNum = matching.reduce((a,c)=>a+(c.value||0),0);
-          return erMetricCurrentValue(x.engagement, x.reach, x.impressions, followersNum);
-        }
+        if(isErMetric) return erMetricCurrentValue(x);
         return x[metricKey]||0;
       };
-      const fmtBreakdownVal = (v)=> isErMetric ? (Math.round(v*10)/10)+"%" : fmt(v);
+      const fmtBreakdownVal = (v)=> isErMetric ? fmtRatePct(v) : fmt(v);
       const parts = [...list].sort((a,b)=>metricOf(b)-metricOf(a)).map(x=>
         breakdownField==="platform"
           ? `${fmtBreakdownVal(metricOf(x))} on ${platformIconHTML(x[labelKey])} ${esc(x[labelKey])}`
@@ -8269,7 +8262,7 @@ function exportCompareWidget(config){
         // Round 115 hotfix: same "engagement_rate" special case as paintMiniKpi() -- this
         // metric has no summable field on totals, so exporting it needs to compute
         // whichever of ERF%/ER%/ERi% is currently selected rather than reading undefined.
-        if(metricKey==="engagement_rate") val = erMetricCurrentValue(t.engagement, t.reach, t.impressions, benchmarkFollowersTotal(null, agg));
+        if(metricKey==="engagement_rate") val = erMetricCurrentValue(rows);
         else if(metricKey==="avg_engagement") val = t.posts ? t.engagement/t.posts : 0;
         else val = t[metricKey]||0;
         aoa = [["Metric","Value"],[metricLabel(metricKey), val]];
@@ -9857,14 +9850,35 @@ function followersNumberFor(P){ return benchmarkFollowersTotal(null, P); }
 // never duplicating the arithmetic. All three read 0 (never NaN/Infinity) when their
 // denominator is unavailable, which is what makes them eligible for the existing
 // zero-value "x to remove" convention everywhere they're used.
-function erfPctValue(engagement, followersNumber){
-  return followersNumber>0 ? (engagement/followersNumber)*100 : 0;
+// ERF% / ER% / ERi% -- the ONE place these rates are calculated. Every card, breakdown,
+// benchmark, comparison, export and sparkline calls engagementRatesFor() with its own subset
+// of posts (an array of post rows) or with an aggregate built by aggregatePerformanceRows()
+// (which accumulates the same per-post sums via addEngagementRateRow()).
+//   ERF% = sum engagement / sum of each post's own Profile followers x 100 (posts without a
+//          follower count are left out of BOTH sides -- never total engagement / total followers)
+//   ER%  = sum engagement / sum reach x 100, only posts with reach > 0 (both sides)
+//   ERi% = sum engagement / sum impressions x 100, only posts with impressions > 0 (both sides)
+function addEngagementRateRow(acc, r, engagementOf){
+  const e = Number(engagementOf(r))||0;
+  const f = Number(r.followers)||0, rc = Number(r.reach)||0, im = Number(r.impressions)||0;
+  if(f>0){ acc.rate_erf_eng += e; acc.rate_erf_followers += f; }
+  if(rc>0){ acc.rate_er_eng += e; acc.rate_er_reach += rc; }
+  if(im>0){ acc.rate_eri_eng += e; acc.rate_eri_impressions += im; }
 }
-function erByReachPctValue(engagement, reach){
-  return reach>0 ? (engagement/reach)*100 : 0;
-}
-function eriByImpressionsPctValue(engagement, impressions){
-  return impressions>0 ? (engagement/impressions)*100 : 0;
+function engagementRatesFor(src, engagementOf){
+  let acc = src;
+  if(Array.isArray(src)){
+    acc = {rate_erf_eng:0, rate_erf_followers:0, rate_er_eng:0, rate_er_reach:0, rate_eri_eng:0, rate_eri_impressions:0};
+    src.forEach(r=>addEngagementRateRow(acc, r, engagementOf || engagementValueOf));
+  }
+  acc = acc || {};
+  const div = (n,d)=> d>0 ? (n/d)*100 : 0;
+  return {
+    erf: div(acc.rate_erf_eng||0, acc.rate_erf_followers||0),
+    er:  div(acc.rate_er_eng||0, acc.rate_er_reach||0),
+    eri: div(acc.rate_eri_eng||0, acc.rate_eri_impressions||0),
+    hasErf: (acc.rate_erf_followers||0)>0, hasEr: (acc.rate_er_reach||0)>0, hasEri: (acc.rate_eri_impressions||0)>0
+  };
 }
 // Round 115: the 3 separate Round 110 KPI cards (ERF%/ER%/ERi%) are unified into one card
 // with a pill toggle beside its title -- default ERF per explicit request. kpiTileFn is
@@ -9880,24 +9894,17 @@ function eriByImpressionsPctValue(engagement, impressions){
 // is no t.engagement_rate), so both call sites need to compute whichever of ERF%/ER%/ERi%
 // STATE.overviewErMetric currently has selected (the same live toggle state the Overview
 // card itself reads) rather than silently reading undefined and always showing 0.
-function erMetricCurrentValue(engagement, reach, impressions, followersNumber){
-  const erMetric = STATE.overviewErMetric || "erf";
-  if(erMetric==="er") return erByReachPctValue(engagement, reach);
-  if(erMetric==="eri") return eriByImpressionsPctValue(engagement, impressions);
-  return erfPctValue(engagement, followersNumber);
+function erMetricCurrentValue(src){
+  return engagementRatesFor(src)[STATE.overviewErMetric || "erf"] || 0;
 }
 function erKpiTileHTML(P, t, kpiTileFn){
   const erMetric = STATE.overviewErMetric || "erf";
   const labels = { erf:"ERF%", er:"ER%", eri:"ERi%" };
-  const rawValues = {
-    erf: erfPctValue(t.engagement, followersNumberFor(P)),
-    er: erByReachPctValue(t.engagement, t.reach),
-    eri: eriByImpressionsPctValue(t.engagement, t.impressions)
-  };
+  const rawValues = engagementRatesFor(P.rowsData||[]);
   const subtitles = {
-    erf: `${esc(engagementMetricLabel())} as a % of total followers`,
-    er: `${esc(engagementMetricLabel())} as a % of reach`,
-    eri: `${esc(engagementMetricLabel())} as a % of impressions`
+    erf: `${esc(engagementMetricLabel())} per post as a % of followers`,
+    er: `${esc(engagementMetricLabel())} as a % of reach (posts with reach)`,
+    eri: `${esc(engagementMetricLabel())} as a % of impressions (posts with impressions)`
   };
   const toggleHtml = `<div class="pill-toggle kpi-er-toggle" id="overviewErMetricToggle">
     <button type="button" data-er-metric="erf" class="${erMetric==="erf"?"active":""}">ERF</button>
@@ -10102,9 +10109,9 @@ function benchmarkRemovedKpisFor(brand){
 function benchmarkMetricValue(key, brand, t, P){
   if(key==="avgPerPost") return t.posts ? t.engagement/t.posts : 0;
   if(key==="followers") return benchmarkFollowersTotal(brand, P);
-  if(key==="erf_1k_followers") return erfPctValue(t.engagement, benchmarkFollowersTotal(brand, P));
-  if(key==="er_by_reach") return erByReachPctValue(t.engagement, t.reach);
-  if(key==="eri_by_impressions") return eriByImpressionsPctValue(t.engagement, t.impressions);
+  if(key==="erf_1k_followers") return engagementRatesFor(P.rowsData||[]).erf;
+  if(key==="er_by_reach") return engagementRatesFor(P.rowsData||[]).er;
+  if(key==="eri_by_impressions") return engagementRatesFor(P.rowsData||[]).eri;
   return t[key]||0;
 }
 // Round 62: "Show % of change" (see renderBenchmarkChangeCompareRow()) -- returns the chosen
@@ -11499,9 +11506,9 @@ function renderTimeBenchSetup(){
 function timeBenchMetricValue(key, t, P){
   if(key==="avgPerPost") return t.posts ? t.engagement/t.posts : 0;
   if(key==="followers") return benchmarkFollowersTotal(null, P);
-  if(key==="erf_1k_followers") return erfPctValue(t.engagement, benchmarkFollowersTotal(null, P));
-  if(key==="er_by_reach") return erByReachPctValue(t.engagement, t.reach);
-  if(key==="eri_by_impressions") return eriByImpressionsPctValue(t.engagement, t.impressions);
+  if(key==="erf_1k_followers") return engagementRatesFor(P.rowsData||[]).erf;
+  if(key==="er_by_reach") return engagementRatesFor(P.rowsData||[]).er;
+  if(key==="eri_by_impressions") return engagementRatesFor(P.rowsData||[]).eri;
   return t[key]||0;
 }
 // Round 51: inclusive day count for the "(N days)" display next to each range's dates --
@@ -12435,14 +12442,14 @@ function perfMatrixBrandPlatformTableHTML(P, brand){
   const body = (P.platforms||[]).map(pf=>{
     const row = byPf[pf] || Object.assign({platform:pf}, freshPerfAgg());
     const avg = row.posts ? row.engagement/row.posts : 0;
-    const er = row.reach ? row.engagement/row.reach*100 : null;
+    const er = engagementRatesFor(row).hasEr ? engagementRatesFor(row).er : null;
     const bc = bestContent[pf];
     return `<tr>
       <td style="text-align:left">${platformIconHTML(pf)} ${esc(cap(pf))}</td>
       <td style="text-align:right;vertical-align:middle">${fmt(row.posts)}</td>
       <td style="text-align:right;vertical-align:middle">${fmt(row.engagement)}</td>
       <td style="text-align:right;vertical-align:middle">${fmt(Math.round(avg))}</td>
-      <td style="text-align:right;vertical-align:middle">${er!=null?er.toFixed(1)+"%":"N/A"}</td>
+      <td style="text-align:right;vertical-align:middle">${er!=null?fmtRatePct(er):"N/A"}</td>
       <td style="vertical-align:middle">${bc&&bc.type?esc(cap(bc.type)):"N/A"}${bc&&bc.type?`<div style="font-size:11px;color:var(--text-muted)">by ${bc.byReach?"ER%":label.toLowerCase()}</div>`:""}</td>
     </tr>`;
   }).join("");
@@ -13108,7 +13115,7 @@ function perfPlatformMetricDefs(P){
     { key:"posts", label:"Total posts", shortLabel:"Posts", isPct:false, available: totalPosts>0, value:(p)=>p.posts||0 },
     { key:"engagement", label:perfTotalLabel(label), shortLabel:label, isPct:false, available: totalEngagement>0, value:(p)=>p.engagement||0 },
     { key:"avgPerPost", label:"Avg. "+label.toLowerCase()+" per post", shortLabel:"Avg/post", isPct:false, available: totalPosts>0 && totalEngagement>0, value:(p)=> p.posts ? p.engagement/p.posts : 0 },
-    { key:"er", label:"Engagement rate", shortLabel:"ER%", isPct:true, available: totalReach>0, value:(p)=> p.reach ? p.engagement/p.reach*100 : 0 },
+    { key:"er", label:"Engagement rate", shortLabel:"ER%", isPct:true, available: totalReach>0, value:(p)=> engagementRatesFor(p).er },
     { key:"reach", label:"Reach", shortLabel:"Reach", isPct:false, available: totalReach>0, value:(p)=>p.reach||0 },
     { key:"impressions", label:"Impressions", shortLabel:"Impr.", isPct:false, available: totalImpressions>0, value:(p)=>p.impressions||0 },
     { key:"videoViews", label:"Video views", shortLabel:"Views", isPct:false, available: totalVideoViews>0, value:(p)=>p.video_views||0 }
@@ -13126,7 +13133,7 @@ function perfTotalLabel(label){
 }
 function perfPlatformMetricFmt(def, val){
   if(val==null) return "N/A";
-  return def.isPct ? val.toFixed(1)+"%" : fmt(Math.round(val));
+  return def.isPct ? fmtRatePct(val) : fmt(Math.round(val));
 }
 // Best content type per platform, ranked by engagement rate (engagement/reach) when this
 // platform's rows actually carry reach data, falling back to raw engagement when they don't
@@ -13138,9 +13145,8 @@ function perfPlatformBestContentType(P){
     const pf = r.platform || "Unknown";
     const ct = r.content_type || "Unknown";
     if(!byPf[pf]) byPf[pf] = {};
-    if(!byPf[pf][ct]) byPf[pf][ct] = { engagement:0, reach:0 };
-    byPf[pf][ct].engagement += engagementValueOf(r);
-    byPf[pf][ct].reach += Number(r.reach)||0;
+    if(!byPf[pf][ct]) byPf[pf][ct] = freshPerfAgg();
+    addPerfRowTo(byPf[pf][ct], r);
   });
   const best = {};
   Object.keys(byPf).forEach(pf=>{
@@ -13149,7 +13155,7 @@ function perfPlatformBestContentType(P){
     let bestType = null, bestScore = -1;
     Object.keys(types).forEach(ct=>{
       const t = types[ct];
-      const score = hasReach ? (t.reach ? t.engagement/t.reach*100 : -1) : t.engagement;
+      const score = hasReach ? (engagementRatesFor(t).hasEr ? engagementRatesFor(t).er : -1) : t.engagement;
       if(score>bestScore){ bestScore = score; bestType = ct; }
     });
     best[pf] = { type: bestType, byReach: hasReach };
@@ -13161,7 +13167,7 @@ function perfPlatformEfficiencyTableHTML(P, defs){
   const bestContent = perfPlatformBestContentType(P);
   const enriched = (P.byPlatform||[]).map(p=>{
     const avg = p.posts ? p.engagement/p.posts : 0;
-    const er = p.reach ? p.engagement/p.reach*100 : null;
+    const er = engagementRatesFor(p).hasEr ? engagementRatesFor(p).er : null;
     return Object.assign({}, p, { avgPerPost: avg, er: er });
   });
   const sort = STATE.perfPlatformEfficiencySort || {key:"engagement", dir:"desc"};
@@ -13183,7 +13189,7 @@ function perfPlatformEfficiencyTableHTML(P, defs){
       <td style="text-align:right;vertical-align:middle">${fmt(p.posts)}</td>
       <td style="text-align:right;vertical-align:middle">${fmt(p.engagement)}</td>
       <td style="text-align:right;vertical-align:middle">${fmt(Math.round(p.avgPerPost))}</td>
-      <td style="text-align:right;vertical-align:middle">${p.er!=null?p.er.toFixed(1)+"%":"N/A"}</td>
+      <td style="text-align:right;vertical-align:middle">${p.er!=null?fmtRatePct(p.er):"N/A"}</td>
       <td style="vertical-align:middle">${bc&&bc.type?esc(cap(bc.type)):"N/A"}${bc&&bc.type?`<div style="font-size:11px;color:var(--text-muted)">by ${bc.byReach?"ER%":label.toLowerCase()}</div>`:""}</td>
     </tr>`;
   }).join("");
@@ -13332,7 +13338,7 @@ function perfPlatformMixSectionHTML(mixDefs, P){
 // straight off that post's own row. Engagement rate is genuinely per-post here (that post's
 // own engagement/reach), not the platform aggregate used in the table above.
 function perfPostMetricValue(r, metricKey){
-  if(metricKey==="er") return r.reach>0 ? engagementValueOf(r)/r.reach*100 : null;
+  if(metricKey==="er") return r.reach>0 ? engagementRatesFor([r]).er : null;
   if(metricKey==="reach") return r.reach||0;
   if(metricKey==="impressions") return r.impressions||0;
   if(metricKey==="videoViews") return r.video_views||0;
@@ -13672,7 +13678,7 @@ function perfBrandMetricDefs(P){
     { key:"posts", label:"Total posts", shortLabel:"Posts", isPct:false, available: totalPosts>0, value:(p)=>p.posts||0 },
     { key:"engagement", label:perfTotalLabel(label), shortLabel:label, isPct:false, available: totalEngagement>0, value:(p)=>p.engagement||0 },
     { key:"avgPerPost", label:"Avg. "+label.toLowerCase()+" per post", shortLabel:"Avg/post", isPct:false, available: totalPosts>0 && totalEngagement>0, value:(p)=> p.posts ? p.engagement/p.posts : 0 },
-    { key:"er", label:"Engagement rate", shortLabel:"ER%", isPct:true, available: totalReach>0, value:(p)=> p.reach ? p.engagement/p.reach*100 : 0 },
+    { key:"er", label:"Engagement rate", shortLabel:"ER%", isPct:true, available: totalReach>0, value:(p)=> engagementRatesFor(p).er },
     { key:"reach", label:"Reach", shortLabel:"Reach", isPct:false, available: totalReach>0, value:(p)=>p.reach||0 },
     { key:"impressions", label:"Impressions", shortLabel:"Impr.", isPct:false, available: totalImpressions>0, value:(p)=>p.impressions||0 },
     { key:"videoViews", label:"Video views", shortLabel:"Views", isPct:false, available: totalVideoViews>0, value:(p)=>p.video_views||0 }
@@ -13686,9 +13692,8 @@ function perfBrandBestContentType(P){
     const p = r.profile || "Unknown";
     const ct = r.content_type || "Unknown";
     if(!byP[p]) byP[p] = {};
-    if(!byP[p][ct]) byP[p][ct] = { engagement:0, reach:0 };
-    byP[p][ct].engagement += engagementValueOf(r);
-    byP[p][ct].reach += Number(r.reach)||0;
+    if(!byP[p][ct]) byP[p][ct] = freshPerfAgg();
+    addPerfRowTo(byP[p][ct], r);
   });
   const best = {};
   Object.keys(byP).forEach(p=>{
@@ -13697,7 +13702,7 @@ function perfBrandBestContentType(P){
     let bestType = null, bestScore = -1;
     Object.keys(types).forEach(ct=>{
       const t = types[ct];
-      const score = hasReach ? (t.reach ? t.engagement/t.reach*100 : -1) : t.engagement;
+      const score = hasReach ? (engagementRatesFor(t).hasEr ? engagementRatesFor(t).er : -1) : t.engagement;
       if(score>bestScore){ bestScore = score; bestType = ct; }
     });
     best[p] = { type: bestType, byReach: hasReach };
@@ -13719,7 +13724,7 @@ function perfBrandEfficiencyTableHTML(P, defs){
   const bestContent = perfBrandBestContentType(P);
   const enriched = (P.byProfile||[]).map(p=>{
     const avg = p.posts ? p.engagement/p.posts : 0;
-    const er = p.reach ? p.engagement/p.reach*100 : null;
+    const er = engagementRatesFor(p).hasEr ? engagementRatesFor(p).er : null;
     return Object.assign({}, p, { avgPerPost: avg, er: er });
   });
   const sort = STATE.perfBrandEfficiencySort || {key:"engagement", dir:"desc"};
@@ -13739,7 +13744,7 @@ function perfBrandEfficiencyTableHTML(P, defs){
       <td style="text-align:right;vertical-align:middle">${fmt(p.posts)}</td>
       <td style="text-align:right;vertical-align:middle">${fmt(p.engagement)}</td>
       <td style="text-align:right;vertical-align:middle">${fmt(Math.round(p.avgPerPost))}</td>
-      <td style="text-align:right;vertical-align:middle">${p.er!=null?p.er.toFixed(1)+"%":"N/A"}</td>
+      <td style="text-align:right;vertical-align:middle">${p.er!=null?fmtRatePct(p.er):"N/A"}</td>
       <td style="vertical-align:middle">${bc&&bc.type?esc(cap(bc.type)):"N/A"}${bc&&bc.type?`<div style="font-size:11px;color:var(--text-muted)">by ${bc.byReach?"ER%":label.toLowerCase()}</div>`:""}</td>
     </tr>`;
   }).join("");
@@ -14512,7 +14517,7 @@ function postDetailBodyHTML(post){
   // ER is standardized to reach only across the whole app (Comparison section and here) --
   // do not fall back to the raw imported engagement_rate column, since its basis (reach vs.
   // impressions) varies by which export column matched and can't be trusted to agree with this.
-  const engRate = post.reach>0 ? (engagement/post.reach*100) : null;
+  const engRate = post.reach>0 ? engagementRatesFor([post], p=>p.engagement||0).er : null;
   const repostShare = engagement>0 ? (post.shares/engagement*100) : null;
   const isEngDetail = engagementMetricMode()==="engagements";
 
@@ -14539,7 +14544,7 @@ function postDetailBodyHTML(post){
     </div>
 
     <div class="pd-row"><span class="k">${esc(engagementMetricLabel())}</span><span class="v">${fmt(engagement)}</span></div>
-    <div class="pd-row"><span class="k">Engagement rate</span><span class="v">${engRate!=null?engRate.toFixed(2)+"%":"— (no reach reported)"}</span></div>
+    <div class="pd-row"><span class="k">Engagement rate</span><span class="v">${engRate!=null?fmtRatePct(engRate):"— (no reach reported)"}</span></div>
     <div class="pd-row"><span class="k">Reposts % of ${esc(engagementMetricLabel().toLowerCase())}</span><span class="v">${repostShare!=null?repostShare.toFixed(1)+"%":"—"}</span></div>
 
     ${post.permalink ? `<button class="btn accent" style="width:100%;margin-top:18px" onclick="window.open('${esc(post.permalink)}','_blank','noopener')">View original post ↗</button>`
@@ -15108,7 +15113,7 @@ function bigdSparklineExternalTooltip(context){
     el.style.transform = `translate(calc(-50% + ${dx}px), calc(-100% + ${dy}px))`;
   });
 }
-function bigdMakeSparkline(canvasId, days, series, color){
+function bigdMakeSparkline(canvasId, days, series, color, valueFmt){
   destroyChart(canvasId);
   const canvasEl = $(canvasId);
   if(!canvasEl || typeof Chart==="undefined") return;
@@ -15125,7 +15130,7 @@ function bigdMakeSparkline(canvasId, days, series, color){
           external: bigdSparklineExternalTooltip,
           callbacks:{
             title:(items)=> items.length ? bigdShortDate(days[items[0].dataIndex]) : "",
-            label:(item)=> fmt(item.parsed.y)
+            label:(item)=> (valueFmt||fmt)(item.parsed.y)
           }
         }
       },
@@ -15176,27 +15181,18 @@ function bindOverviewSparklines(P){
     const posts = seriesFor(P.dailyPostsTotal), eng = seriesFor(P.dailyInteractionsTotal);
     return posts.map((p,i)=> p ? eng[i]/p : 0);
   })();
-  // Round 110: per-day series for the 3 new engagement-rate KPI cards, same "derive a daily
-  // ratio from two existing daily series" approach avgSeries above already uses. Followers
-  // Number is one fixed value across the whole range (followersNumberFor(P) -- the latest-
-  // date-within-range snapshot, not a per-day figure), so ERF's series divides each day's
-  // interactions by that same constant denominator throughout.
   const dailyEngagementSeries = seriesFor(P.dailyInteractionsTotal);
   const dailyReachSeries = seriesFor(bigdTotalDailyReach(P));
   const dailyImpressionsSeries = seriesFor(bigdDailySum(rows,"impressions"));
-  // Round 115: the stale "*1000" here was a Round-110-era leftover from before Round 112
-  // redefined ERF% to engagement/total followers (no per-1000 multiplier) -- erfPctValue()
-  // itself was corrected then, but this separate sparkline formula never was, so the mini
-  // chart was silently plotting a scale 1000x the card's own value. Fixed to match
-  // erfPctValue() exactly. The 3 Round 110 cards are now ONE unified card (see
+  // The 3 Round 110 cards are now ONE unified card (see
   // erKpiTileHTML()), so only whichever metric STATE.overviewErMetric currently selects
   // gets its sparkline painted, onto the single shared "sparkEngagementRate" canvas.
-  const followersNumForSpark = followersNumberFor(P);
-  const erfSeries = dailyEngagementSeries.map(v => followersNumForSpark>0 ? (v/followersNumForSpark)*100 : 0);
-  const erByReachSeries = dailyEngagementSeries.map((v,i)=> dailyReachSeries[i] ? (v/dailyReachSeries[i])*100 : 0);
-  const eriByImpressionsSeries = dailyEngagementSeries.map((v,i)=> dailyImpressionsSeries[i] ? (v/dailyImpressionsSeries[i])*100 : 0);
+  // Each day's point = the same engagementRatesFor() formula as the card, applied to that
+  // day's posts only (never a day's engagement / total followers).
+  const rowsByDay = {};
+  rows.forEach(r=>{ const d = dayOf(r.date); if(d!=="unknown") (rowsByDay[d] = rowsByDay[d]||[]).push(r); });
   const erMetricForSpark = STATE.overviewErMetric || "erf";
-  const erActiveSeries = erMetricForSpark==="er" ? erByReachSeries : (erMetricForSpark==="eri" ? eriByImpressionsSeries : erfSeries);
+  const erActiveSeries = days.map(d=> rowsByDay[d] ? engagementRatesFor(rowsByDay[d])[erMetricForSpark] : 0);
   const erActiveColor = erMetricForSpark==="er" ? "#22c55e" : (erMetricForSpark==="eri" ? "#eab308" : "#0ea5e9");
   const specs = [
     ["sparkPosts", seriesFor(P.dailyPostsTotal), "#8b5cf6"],
@@ -15209,10 +15205,10 @@ function bindOverviewSparklines(P){
     ["sparkShares", seriesFor(bigdDailySum(rows,"shares")), "#a855f7"],
     ["sparkVideoViews", seriesFor(bigdDailySum(rows,"video_views")), "#14b8a6"],
     ["sparkStories", seriesFor(bigdDailyStoryCount(rows)), "#f472b6"],
-    ["sparkEngagementRate", erActiveSeries, erActiveColor]
+    ["sparkEngagementRate", erActiveSeries, erActiveColor, fmtRatePct]
   ];
-  specs.forEach(([id, series, color])=>{
-    if($(id)) bigdMakeSparkline(id, days, series, color);
+  specs.forEach(([id, series, color, valueFmt])=>{
+    if($(id)) bigdMakeSparkline(id, days, series, color, valueFmt);
   });
 }
 
@@ -17201,7 +17197,7 @@ function computeTimelineWidget(q, w, metricsById){
     if(raw==null || raw==="") return;
     const d = new Date(raw);
     if(isNaN(d.getTime())) return;
-    const key = d.toISOString().slice(0,10);
+    const key = localDayKey(d);
     (byDay[key] = byDay[key]||[]).push(r);
   });
   const days = Object.keys(byDay).sort();
