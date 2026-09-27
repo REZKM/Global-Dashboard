@@ -11,7 +11,7 @@ data quality, plus Benchmark view, Executive Intelligence and Ask me panels.
 | Path | What it is |
 |---|---|
 | `public/dashboard/index.html` | The whole dashboard: one self-contained page (HTML, CSS, app code and the SheetJS / Chart.js / JSZip libraries inline). |
-| `DESIGN.md` | **The design system.** Every colour, font, size, radius and shadow. Edit it to restyle the site. |
+| `DESIGN.md` | **The design system** (extend 2026 brand). Every colour, font, size, radius and shadow. Edit it to restyle the site. |
 | `design.js` | Reads `DESIGN.md` and turns it into CSS variables for every page. |
 | `server.js` | Express server: login flow, saved-views API, serves the dashboard. |
 | `db.js` | Postgres tables for users (bcrypt-hashed passwords) and saved views. |

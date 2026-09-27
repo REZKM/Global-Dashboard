@@ -49,7 +49,8 @@ function declarations(tokens) {
 }
 
 // Light is the default; html.dark-mode switches to dark. Anything marked .theme-light
-// (the setup wizard, login pages) always stays light. Phones always use light, as before.
+// (the setup wizard, login pages) always stays light; anything marked .theme-dark (brand
+// black panels) always uses the dark values. Phones always use light, as before.
 function buildCss({ light, dark }) {
   const l = declarations(light);
   const d = declarations(dark);
@@ -57,6 +58,7 @@ function buildCss({ light, dark }) {
     `:root, .theme-light {\n${l}\n  color-scheme: light;\n}`,
     `html.dark-mode {\n${d}\n  color-scheme: dark;\n}`,
     `html.dark-mode .theme-light {\n${l}\n  color-scheme: light;\n}`,
+    `.theme-dark {\n${d}\n  color-scheme: dark;\n}`,
     `@media (max-width: 760px) {\n  html.dark-mode {\n${l}\n    color-scheme: light;\n  }\n}`,
   ].join('\n');
 }
