@@ -42,7 +42,7 @@ How to edit:
 | `color-inverse` | `#171c1a` | `#2b302e` | Dark chips, tooltips, toasts |
 | `color-on-inverse` | `#f4f6f5` | `#f4f6f5` | Text on the inverse colour |
 | `color-on-inverse-muted` | `#aab3ae` | `#aab3ae` | Secondary text on the inverse colour |
-| `color-overlay` | `rgba(15,20,18,0.28)` | `rgba(0,0,0,0.55)` | Backdrop behind modals and panels |
+| `color-overlay` | `rgba(15,20,18,0.16)` | `rgba(0,0,0,0.4)` | Tint over the blurred dashboard behind modals and panels |
 | `color-shadow` | `rgba(16,24,20,0.08)` | `rgba(0,0,0,0.45)` | Shadow tint |
 | `color-scrollbar` | `#cfd3ce` | `#3d4340` | Scrollbar thumb |
 
@@ -158,6 +158,7 @@ system fonts only.
 | `shadow-sm` | `0 1px 2px var(--color-shadow)` | `0 1px 2px var(--color-shadow)` | Cards at rest |
 | `shadow-md` | `0 2px 4px var(--color-shadow), 0 6px 16px var(--color-shadow)` | `0 2px 4px var(--color-shadow), 0 6px 16px var(--color-shadow)` | Hovered cards, dropdowns |
 | `shadow-lg` | `0 12px 40px var(--color-shadow)` | `0 12px 40px var(--color-shadow)` | Modals and side panels |
+| `overlay-blur` | `6px` | `6px` | How strongly the dashboard is blurred behind modals, panels and pop-ups |
 
 ## Layout
 
